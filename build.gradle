@@ -152,7 +152,8 @@ ext {
 
   log4j2Libs = [
     libs.log4j2Api,
-    libs.log4j2Core
+    libs.log4j2Core,
+    libs.slf4jLog4j2
   ]
 
   testLog4j2Libs = [
@@ -2566,7 +2567,7 @@ project(':trogdor') {
     implementation libs.argparse4j
     implementation libs.jacksonDatabind
     implementation libs.jacksonJDK8Datatypes
-    implementation libs.slf4jApi
+    implementation libs.slf4jLog4j2
 
     implementation libs.jacksonJakartarsJsonProvider
     implementation libs.jerseyContainerServlet
