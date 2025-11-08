@@ -256,7 +256,7 @@ public class LogSegment implements Closeable {
 
             ensureOffsetInRange(largestOffset);
 
-            // append the messages
+            // append the messages 写消息
             long appendedBytes = log.append(records);
             LOGGER.trace("Appended {} to {} at end offset {}", appendedBytes, log.file(), largestOffset);
 
@@ -454,6 +454,7 @@ public class LogSegment implements Closeable {
         // calculate the length of the message set to read based on whether or not they gave us a maxOffset
         int fetchSize = Math.min((int) (maxPositionOpt.get() - startPosition), adjustedMaxSize);
 
+        // 获取文件指定位置的数据
         return new FetchDataInfo(offsetMetadata, log.slice(startPosition, fetchSize),
             adjustedMaxSize < startOffsetAndSize.size, Optional.empty());
     }

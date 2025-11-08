@@ -49,6 +49,8 @@ import java.util
 import java.util.stream.Collectors
 
 /**
+ * kafka日志管理：负责日志的创建、检索和清理。
+ *
  * The entry point to the kafka log management subsystem. The log manager is responsible for log creation, retrieval, and cleaning.
  * All read and write operations are delegated to the individual log instances.
  *
@@ -59,7 +61,7 @@ import java.util.stream.Collectors
  * A background thread handles log retention by periodically truncating excess log segments.
  */
 @threadsafe
-class LogManager(logDirs: Seq[File],
+class LogManager(logDirs: Seq[File], // log.dirs配置的目录，即存放消息日志的目录
                  initialOfflineDirs: Seq[File],
                  configRepository: ConfigRepository,
                  val initialDefaultConfig: LogConfig,
@@ -319,6 +321,18 @@ class LogManager(logDirs: Seq[File],
   // Only for testing
   private[log] def hasLogsToBeDeleted: Boolean = !logsToBeDeleted.isEmpty
 
+  /**
+   * 加载日志UnifiedLog
+   * @param logDir
+   * @param hadCleanShutdown
+   * @param recoveryPoints
+   * @param logStartOffsets
+   * @param defaultConfig
+   * @param topicConfigOverrides
+   * @param numRemainingSegments
+   * @param isStray
+   * @return
+   */
   private[log] def loadLog(logDir: File,
                            hadCleanShutdown: Boolean,
                            recoveryPoints: util.Map[TopicPartition, JLong],
@@ -332,6 +346,7 @@ class LogManager(logDirs: Seq[File],
     val logRecoveryPoint = recoveryPoints.getOrDefault(topicPartition, 0L)
     val logStartOffset = logStartOffsets.getOrDefault(topicPartition, 0L)
 
+    // 创建UnifiedLog
     val log = UnifiedLog.create(
       logDir,
       config,
@@ -365,6 +380,7 @@ class LogManager(logDirs: Seq[File],
       warn(s"Log in ${logDir.getAbsolutePath} marked stray and renamed to ${log.dir.getAbsolutePath}")
     } else {
       val previous = {
+        // 添加到成员变量
         if (log.isFuture)
           this.futureLogs.put(topicPartition, log)
         else
@@ -406,6 +422,7 @@ class LogManager(logDirs: Seq[File],
   }
 
   /**
+   * 加载本地分区日志，封装成UnifiedLog保存到内存
    * Recover and load all logs in the given data directories
    */
   private[log] def loadLogs(defaultConfig: LogConfig, topicConfigOverrides: Map[String, LogConfig], isStray: UnifiedLog => Boolean): Unit = {
@@ -426,6 +443,7 @@ class LogManager(logDirs: Seq[File],
     }
 
     val uncleanLogDirs = mutable.Buffer.empty[String]
+    // 遍历log.dirs目录
     for (dir <- liveLogDirs) {
       val logDirAbsolutePath = dir.getAbsolutePath
       var hadCleanShutdown: Boolean = false
@@ -461,6 +479,7 @@ class LogManager(logDirs: Seq[File],
             Collections.emptyMap[TopicPartition, JLong]
         }
 
+        // 获取待加载的分区日志
         val logsToLoad = Option(dir.listFiles).getOrElse(Array.empty).filter(logDir =>
           logDir.isDirectory &&
             // Ignore remote-log-index-cache directory as that is index cache maintained by tiered storage subsystem
@@ -488,6 +507,7 @@ class LogManager(logDirs: Seq[File],
             var log = None: Option[UnifiedLog]
             val logLoadStartMs = time.hiResClockMs()
             try {
+              // 加载日志UnifiedLog
               log = Some(loadLog(logDir, hadCleanShutdown, recoveryPoints, logStartOffsets,
                 defaultConfig, topicConfigOverrides, numRemainingSegments, isStray))
             } catch {
@@ -571,6 +591,7 @@ class LogManager(logDirs: Seq[File],
   }
 
   /**
+   *  启动后台线程进行刷新和清理日志
    *  Start the background threads to flush logs and do log cleanup
    */
   def startup(topicNames: Set[String], isStray: UnifiedLog => Boolean = _ => false): Unit = {
@@ -605,9 +626,11 @@ class LogManager(logDirs: Seq[File],
     defaultConfig: LogConfig,
     topicConfigOverrides: Map[String, LogConfig],
     isStray: UnifiedLog => Boolean): Unit = {
+    // 加载日志
     loadLogs(defaultConfig, topicConfigOverrides, isStray) // this could take a while if shutdown was not clean
 
     /* Schedule the cleanup task to delete old logs */
+    // 启动后台定时清理任务
     if (scheduler != null) {
       info("Starting log cleanup with a period of %d ms.".format(retentionCheckMs))
       scheduler.schedule("kafka-log-retention",
@@ -1526,6 +1549,17 @@ class LogManager(logDirs: Seq[File],
 
 object LogManager {
 
+  /**
+   * 服务启动时，初始化日志管理器：kafka.server.BrokerServer#logManager()
+   * @param config
+   * @param initialOfflineDirs
+   * @param configRepository
+   * @param kafkaScheduler
+   * @param time
+   * @param brokerTopicStats
+   * @param logDirFailureChannel
+   * @return
+   */
   def apply(config: KafkaConfig,
             initialOfflineDirs: Seq[String],
             configRepository: ConfigRepository,
@@ -1533,14 +1567,19 @@ object LogManager {
             time: Time,
             brokerTopicStats: BrokerTopicStats,
             logDirFailureChannel: LogDirFailureChannel): LogManager = {
+    // 获取日志相关的配置
     val defaultProps = config.extractLogConfigMap
 
+    // 校验配置
     LogConfig.validateBrokerLogConfigValues(defaultProps, config.remoteLogManagerConfig.isRemoteStorageSystemEnabled)
+    // 解析LogConfig对象
     val defaultLogConfig = new LogConfig(defaultProps)
-
+    // 解析CleanerConfig对象
     val cleanerConfig = new CleanerConfig(config)
+    // 解析TransactionLogConfig对象
     val transactionLogConfig = new TransactionLogConfig(config)
 
+    // 创建LogManager
     new LogManager(logDirs = config.logDirs.asScala.map(new File(_).getAbsoluteFile),
       initialOfflineDirs = initialOfflineDirs.map(new File(_).getAbsoluteFile),
       configRepository = configRepository,

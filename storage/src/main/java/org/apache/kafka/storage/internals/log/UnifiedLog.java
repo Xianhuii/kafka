@@ -324,7 +324,9 @@ public class UnifiedLog implements AutoCloseable {
                                     LogOffsetsListener logOffsetsListener) throws IOException {
         // create the log directory if it doesn't exist
         Files.createDirectories(dir.toPath());
+        // 根据目录名解析Topic和分区信息，例如：test-0的topic是test，分区是0
         TopicPartition topicPartition = UnifiedLog.parseTopicPartitionName(dir);
+        // 创建LogSegments，用来管理该分区下的分段日志
         LogSegments segments = new LogSegments(topicPartition);
         // The created leaderEpochCache will be truncated by LogLoader if necessary
         // so it is guaranteed that the epoch entries will be correct even when on-disk
@@ -358,6 +360,7 @@ public class UnifiedLog implements AutoCloseable {
                 numRemainingSegments,
                 isRemoteLogEnabled
                 ).load();
+        // 创建LocalLog，支持对segments的管理和增删改查操作
         LocalLog localLog = new LocalLog(
                 dir,
                 config,
@@ -1062,6 +1065,8 @@ public class UnifiedLog implements AutoCloseable {
     }
 
     /**
+     * 写消息到对应segment的日志文件
+     * <p>
      * Append this message set to the active segment of the local log, rolling over to a fresh segment if necessary.
      *
      * <p>This method will generally be responsible for assigning offsets to the messages,
@@ -1088,8 +1093,10 @@ public class UnifiedLog implements AutoCloseable {
                                  byte toMagic) {
         // We want to ensure the partition metadata file is written to the log dir before any log data is written to disk.
         // This will ensure that any log data can be recovered with the correct topic ID in the case of failure.
+        // 刷新元数据：partition.metadata
         maybeFlushMetadataFile();
 
+        // 校验消息
         LogAppendInfo appendInfo = analyzeAndValidateRecords(records, origin, ignoreRecordSize, !validateAndAssignOffsets, leaderEpoch);
 
         // return if we have no valid messages or if this is a duplicate of the last appended entry
@@ -1097,6 +1104,7 @@ public class UnifiedLog implements AutoCloseable {
             return appendInfo;
         } else {
             // trim any invalid bytes or partial messages before appending it to the on-disk log
+            // 读取有效消息
             final MemoryRecords trimmedRecords = trimInvalidBytes(records, appendInfo);
             // they are valid, insert them in the log
             synchronized (lock)  {
@@ -1107,8 +1115,10 @@ public class UnifiedLog implements AutoCloseable {
                             localLog.checkIfMemoryMappedBufferClosed();
                             if (validateAndAssignOffsets) {
                                 // assign offsets to the message set
+                                // 获取topic分区的offset
                                 PrimitiveRef.LongRef offset = PrimitiveRef.ofLong(localLog.logEndOffset());
                                 appendInfo.setFirstOffset(offset.value);
+                                // 选择压缩算法
                                 Compression targetCompression = BrokerCompressionType.targetCompression(config().compression, appendInfo.sourceCompression());
                                 LogValidator validator = new LogValidator(validRecords,
                                         topicPartition(),
@@ -1123,6 +1133,7 @@ public class UnifiedLog implements AutoCloseable {
                                         leaderEpoch,
                                         origin
                                 );
+                                // 校验&计算offset
                                 LogValidator.ValidationResult validateAndOffsetAssignResult = validator.validateMessagesAndAssignOffsets(offset,
                                         validatorMetricsRecorder,
                                         requestLocal.orElseThrow(() -> new IllegalArgumentException(
@@ -1196,6 +1207,7 @@ public class UnifiedLog implements AutoCloseable {
                             }
 
                             // maybe roll the log if this segment is full
+                            // 获取对应的segment
                             LogSegment segment = maybeRoll(validRecords.sizeInBytes(), appendInfo);
 
                             LogOffsetMetadata logOffsetMetadata = new LogOffsetMetadata(
@@ -1223,6 +1235,7 @@ public class UnifiedLog implements AutoCloseable {
                                 // will be cleaned up after the log directory is recovered. Note that the end offset of the
                                 // ProducerStateManager will not be updated and the last stable offset will not advance
                                 // if the append to the transaction index fails.
+                                // 将消息添加到最新的segment
                                 localLog.append(appendInfo.lastOffset(), validRecords);
                                 updateHighWatermarkWithLogEndOffset();
 
@@ -1594,6 +1607,8 @@ public class UnifiedLog implements AutoCloseable {
     }
 
     /**
+     * 从日志文件中读取消息
+     * <p>
      * Read messages from the log.
      *
      * @param startOffset The offset to begin reading at
@@ -2093,11 +2108,13 @@ public class UnifiedLog implements AutoCloseable {
      */
     private LogSegment maybeRoll(int messagesSize, LogAppendInfo appendInfo) throws IOException {
         synchronized (lock) {
+            // 获取最新的segment
             LogSegment segment = localLog.segments().activeSegment();
             long now = time().milliseconds();
             long maxTimestampInMessages = appendInfo.maxTimestamp();
             long maxOffsetInMessages = appendInfo.lastOffset();
 
+            // 判断是否需要滚动：创建新的segment
             if (segment.shouldRoll(new RollParams(config().maxSegmentMs(), config().segmentSize(), appendInfo.maxTimestamp(), appendInfo.lastOffset(), messagesSize, now))) {
                 logger.debug("Rolling new log segment (log_size = {}/{}}, " +
                           "offset_index_size = {}/{}, " +
@@ -2122,6 +2139,7 @@ public class UnifiedLog implements AutoCloseable {
                 long rollOffset = appendInfo.firstOffset() == UnifiedLog.UNKNOWN_OFFSET
                     ? maxOffsetInMessages - Integer.MAX_VALUE
                     : appendInfo.firstOffset();
+                // 滚动：创建新的segment
                 return roll(Optional.of(rollOffset));
             } else {
                 return segment;

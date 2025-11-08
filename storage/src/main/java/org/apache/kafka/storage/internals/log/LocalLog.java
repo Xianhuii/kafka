@@ -473,6 +473,7 @@ public class LocalLog {
                     }
                     LogOffsetMetadata endOffsetMetadata = nextOffsetMetadata;
                     long endOffset = endOffsetMetadata.messageOffset;
+                    // 根据offset获取segment
                     Optional<LogSegment> segmentOpt = segments.floorSegment(startOffset);
                     // return error on attempt to read beyond the log end offset
                     if (startOffset > endOffset || segmentOpt.isEmpty()) {
@@ -502,6 +503,7 @@ public class LocalLog {
                         else
                             maxPositionOpt = Optional.empty();
 
+                        // 根据offset读取消息
                         fetchDataInfo = segment.read(startOffset, maxLength, maxPositionOpt, minOneMessage);
                         if (fetchDataInfo != null) {
                             if (includeAbortedTxns) {
@@ -524,7 +526,9 @@ public class LocalLog {
     }
 
     public void append(long lastOffset, MemoryRecords records) throws IOException {
+        // 将消息写到最新的segment
         segments.activeSegment().append(lastOffset, records);
+        // 更新offset
         updateLogEndOffset(lastOffset + 1);
     }
 

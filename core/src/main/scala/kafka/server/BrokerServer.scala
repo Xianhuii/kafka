@@ -208,7 +208,8 @@ class BrokerServer(
 
       // Create log manager, but don't start it because we need to delay any potential unclean shutdown log recovery
       // until we catch up on the metadata log and have up-to-date topic and broker configs.
-      logManager = LogManager(config,
+      // 服务启动时初始化日志管理器
+      logManager = LogManager(config, // kafka启动配置
         sharedServer.metaPropsEnsemble.errorLogDirs().asScala.toSeq,
         metadataCache,
         kafkaScheduler,
