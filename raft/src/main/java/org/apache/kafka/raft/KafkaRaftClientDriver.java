@@ -61,6 +61,7 @@ public class KafkaRaftClientDriver<T> extends ShutdownableThread {
     @Override
     public void doWork() {
         try {
+            // 执行raft协议流程
             client.poll();
         } catch (Throwable t) {
             throw fatalFaultHandler.handleFault("Unexpected error in raft IO thread", t);

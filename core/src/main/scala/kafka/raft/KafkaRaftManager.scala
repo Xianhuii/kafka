@@ -81,6 +81,7 @@ object KafkaRaftManager {
   }
 }
 
+// 创建KRaft管理器
 class KafkaRaftManager[T](
   clusterId: String,
   config: KafkaConfig,
@@ -130,14 +131,19 @@ class KafkaRaftManager[T](
   override val client: KafkaRaftClient[T] = buildRaftClient()
   private val clientDriver = new KafkaRaftClientDriver[T](client, threadNamePrefix, fatalFaultHandler, logContext)
 
+  // 启动KRaft管理器
   def startup(): Unit = {
+    // 初始化KafkaRaftClient
     client.initialize(
       controllerQuorumVotersFuture.get(),
+      // 使用文件保存当前节点的仲裁状态
       new FileQuorumStateStore(new File(dataDir, FileQuorumStateStore.DEFAULT_FILE_NAME)),
       metrics,
       externalKRaftMetrics
     )
+    // 启动KafkaNetworkChannel，用于执行raft请求
     netChannel.start()
+    // 启动KRaft驱动，用来执行raft协议流程
     clientDriver.start()
   }
 
@@ -160,6 +166,7 @@ class KafkaRaftManager[T](
     clientDriver.handleRequest(context, header, request, createdTimeMs)
   }
 
+  // 创建KafkaRaftClient
   private def buildRaftClient(): KafkaRaftClient[T] = {
     new KafkaRaftClient(
       OptionalInt.of(config.nodeId),

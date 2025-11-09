@@ -132,6 +132,7 @@ public abstract class ShutdownableThread extends Thread {
         isStarted = true;
         log.info("Starting");
         try {
+            // 循环执行任务
             while (isRunning())
                 doWork();
         } catch (FatalExitError e) {

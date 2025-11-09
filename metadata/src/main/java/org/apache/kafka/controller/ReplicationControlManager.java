@@ -618,6 +618,7 @@ public class ReplicationControlManager {
         return numRemoved;
     }
 
+    // 创建topic
     ControllerResult<CreateTopicsResponseData> createTopics(
         ControllerRequestContext context,
         CreateTopicsRequestData request,
@@ -663,6 +664,7 @@ public class ReplicationControlManager {
             }
             ApiError error;
             try {
+                // 创建topic
                 error = createTopic(context, topic, records, successes, configRecords, describable.contains(topic.name()));
             } catch (ApiException e) {
                 error = ApiError.fromThrowable(e);
@@ -764,6 +766,7 @@ public class ReplicationControlManager {
             return new ApiError(Errors.INVALID_PARTITIONS,
                 "Number of partitions was set to an invalid non-positive value.");
         } else {
+            // topic按照分区分配给集群中的各个节点
             int numPartitions = topic.numPartitions() == -1 ?
                 defaultNumPartitions : topic.numPartitions();
             short replicationFactor = topic.replicationFactor() == -1 ?

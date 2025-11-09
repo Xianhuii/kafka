@@ -284,6 +284,7 @@ class SharedServer(
 
         val externalKRaftMetrics = new DefaultExternalKRaftMetrics(Option(brokerMetrics), Option(controllerServerMetrics))
 
+        // 创建KRaft管理器
         val _raftManager = new KafkaRaftManager[ApiMessageAndVersion](
           clusterId,
           sharedServerConfig,
@@ -301,6 +302,7 @@ class SharedServer(
           raftManagerFaultHandler
         )
         raftManager = _raftManager
+        // 启动KRaft管理器
         _raftManager.startup()
 
         nodeMetrics = new NodeMetrics(metrics, controllerConfig.unstableFeatureVersionsEnabled)

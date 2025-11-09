@@ -142,6 +142,7 @@ public class QuorumState {
         // We initialize in whatever state we were in on shutdown. If we were a leader
         // or candidate, probably an election was held, but we will find out about it
         // when we send Vote or BeginEpoch requests.
+        // 从文件中读取选举状态
         ElectionState election = readElectionState();
 
         final EpochState initialState;

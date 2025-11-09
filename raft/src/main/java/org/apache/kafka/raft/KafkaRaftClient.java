@@ -314,6 +314,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
         this.quorumConfig = quorumConfig;
         this.snapshotCleaner = new RaftMetadataLogCleanerManager(logger, time, 60000, log::maybeClean);
 
+        // 解析集群的节点地址
         if (!bootstrapServers.isEmpty()) {
             // generate Node objects from network addresses by using decreasing negative ids
             AtomicInteger id = new AtomicInteger(-2);
@@ -475,6 +476,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
         }
     }
 
+    // 初始化RequestManager
     public void initialize(
         Map<Integer, InetSocketAddress> voterAddresses,
         QuorumStateStore quorumStateStore,
@@ -487,6 +489,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
 
         kafkaRaftMetrics = new KafkaRaftMetrics(metrics, "raft");
 
+        // 元数据状态及
         partitionState = new KRaftControlRecordStateMachine(
             staticVoters,
             log,
@@ -536,6 +539,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
             );
         }
 
+        // 当前节点的仲裁状态
         quorum = new QuorumState(
             nodeId,
             nodeDirectoryId,
@@ -556,8 +560,10 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
         // so there are no unknown voter connections. Report this metric as 0.
         kafkaRaftMetrics.updateNumUnknownVoterConnections(0);
 
+        // 初始化节点仲裁状态
         quorum.initialize(new OffsetAndEpoch(log.endOffset().offset(), log.lastFetchedEpoch()));
 
+        // 根据不同角色分别处理
         long currentTimeMs = time.milliseconds();
         if (quorum.isLeader()) {
             throw new IllegalStateException("Voter cannot initialize as a Leader");
@@ -565,6 +571,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
             // When there is only a single voter, become leader immediately.
             // transitionToProspective will handle short-circuiting voter to candidate state
             // and transitionToCandidate will handle short-circuiting voter to leader state
+            // 转换到ProspectiveState
             transitionToProspective(currentTimeMs);
         } else if (quorum.isCandidate()) {
             onBecomeCandidate(currentTimeMs);
@@ -572,7 +579,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
             onBecomeFollower(currentTimeMs);
         }
 
-        // Specialized add voter handler
+        // Specialized add voter handler 投票处理器
         this.addVoterHandler = new AddVoterHandler(
             partitionState,
             new DefaultRequestSender(
@@ -585,7 +592,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
             logContext
         );
 
-        // Specialized remove voter handler
+        // Specialized remove voter handler 远程投票处理器
         this.removeVoterHandler = new RemoveVoterHandler(
             nodeId,
             nodeDirectoryId,
@@ -2829,9 +2836,12 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
     private void handleInboundMessage(RaftMessage message, long currentTimeMs) {
         logger.trace("Received inbound message {}", message);
 
+        // 处理请求
         if (message instanceof RaftRequest.Inbound request) {
             handleRequest(request, currentTimeMs);
-        } else if (message instanceof RaftResponse.Inbound response) {
+        }
+        // 处理响应
+        else if (message instanceof RaftResponse.Inbound response) {
             if (requestManager.isResponseExpected(response.source(), response.correlationId())) {
                 handleResponse(response, currentTimeMs);
             } else {
@@ -3664,19 +3674,23 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
             return;
         }
 
+        // 获取当前状态剩余时间
         long pollStateTimeoutMs = pollCurrentState(startPollTimeMs);
+        // 清除快照剩余时间
         long cleaningTimeoutMs = snapshotCleaner.maybeClean(startPollTimeMs);
         long pollTimeoutMs = Math.min(pollStateTimeoutMs, cleaningTimeoutMs);
 
         long startWaitTimeMs = time.milliseconds();
         kafkaRaftMetrics.updatePollStart(startWaitTimeMs);
 
+        // 阻塞获取Raft消息
         RaftMessage message = messageQueue.poll(pollTimeoutMs);
 
         long endWaitTimeMs = time.milliseconds();
         kafkaRaftMetrics.updatePollEnd(endWaitTimeMs);
 
         if (message != null) {
+            // 处理消息
             handleInboundMessage(message, endWaitTimeMs);
         }
 

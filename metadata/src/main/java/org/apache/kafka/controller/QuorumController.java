@@ -802,6 +802,7 @@ public final class QuorumController implements Controller {
             } else {
                 // Pass the records to the Raft layer. This will start the process of committing
                 // them to the log.
+                // 提交任务
                 long offset = appendRecords(log, result, maxRecordsPerBatch,
                     records -> {
                         // Start by trying to apply the record to our in-memory state. This should always
@@ -1453,6 +1454,7 @@ public final class QuorumController implements Controller {
      */
     private final EventPerformanceMonitor performanceMonitor;
 
+    // 创建QuorumController
     private QuorumController(
         FaultHandler nonFatalFaultHandler,
         FaultHandler fatalFaultHandler,
@@ -1759,6 +1761,7 @@ public final class QuorumController implements Controller {
             () -> delegationTokenControlManager.expireDelegationToken(context, request, featureControl.metadataVersionOrThrow()));
     }
 
+    // 创建topic
     @Override
     public CompletableFuture<CreateTopicsResponseData> createTopics(
         ControllerRequestContext context,
