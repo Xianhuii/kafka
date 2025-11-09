@@ -268,6 +268,7 @@ class BrokerServer(
       // Create and start the socket server acceptor threads so that the bound port is known.
       // Delay starting processors until the end of the initialization sequence to ensure
       // that credentials have been loaded before processing authentications.
+      // 创建SocketServer，监听连接，处理请求和响应
       socketServer = new SocketServer(config,
         metrics,
         time,

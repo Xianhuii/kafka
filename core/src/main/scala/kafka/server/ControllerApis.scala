@@ -92,6 +92,7 @@ class ControllerApis(
 
   def close(): Unit = aclApis.close()
 
+  // 处理Controller的API请求
   override def handle(request: RequestChannel.Request, requestLocal: RequestLocal): Unit = {
     try {
       val handlerFuture: CompletableFuture[Unit] = request.header.apiKey match {

@@ -59,6 +59,8 @@ import scala.jdk.CollectionConverters._
 import scala.util.control.ControlThrowable
 
 /**
+ * 处理连接、请求和响应
+ *
  * Handles new connections, requests and responses to and from broker.
  * Kafka supports two types of request planes :
  *  - data-plane :
@@ -140,6 +142,7 @@ class SocketServer(
     }.sum
   })
 
+  // 创建acceptors和processors
   // Create acceptors and processors for the statically configured endpoints when the
   // SocketServer is constructed. Note that this just opens the ports and creates the data
   // structures. It does not start the acceptors and processors or their associated JVM
@@ -219,6 +222,7 @@ class SocketServer(
     val parsedConfigs = config.valuesFromThisConfigWithPrefixOverride(listenerName.configPrefix)
     connectionQuotas.addListener(config, listenerName)
     val isPrivilegedListener = config.interBrokerListenerName == listenerName
+    // 创建Acceptor
     val dataPlaneAcceptor = createDataPlaneAcceptor(endpoint, isPrivilegedListener, dataPlaneRequestChannel)
     config.addReconfigurable(dataPlaneAcceptor)
     dataPlaneAcceptor.configure(parsedConfigs)
@@ -471,6 +475,8 @@ class DataPlaneAcceptor(socketServer: SocketServer,
 }
 
 /**
+ * Acceptor线程：负责监听连接，将新连接分配给Processor
+ *
  * Thread that accepts and configures new connections. There is one of these per endpoint.
  */
 private[kafka] abstract class Acceptor(val socketServer: SocketServer,
@@ -585,6 +591,8 @@ private[kafka] abstract class Acceptor(val socketServer: SocketServer,
   }
 
   /**
+   * 监听连接
+   *
    * Accept loop that checks for new connection attempts
    */
   override def run(): Unit = {
@@ -592,7 +600,9 @@ private[kafka] abstract class Acceptor(val socketServer: SocketServer,
     try {
       while (shouldRun.get()) {
         try {
+          // 监听连接
           acceptNewConnections()
+          // 关闭限流的连接
           closeThrottledConnections()
         }
         catch {
@@ -639,8 +649,10 @@ private[kafka] abstract class Acceptor(val socketServer: SocketServer,
    * Listen for new connections and assign accepted connections to processors using round-robin.
    */
   private def acceptNewConnections(): Unit = {
+    // 阻塞调用nio的select
     val ready = nioSelector.select(500)
     if (ready > 0) {
+      // 获取新连接
       val keys = nioSelector.selectedKeys()
       val iter = keys.iterator()
       while (iter.hasNext && shouldRun.get()) {
@@ -649,6 +661,7 @@ private[kafka] abstract class Acceptor(val socketServer: SocketServer,
           iter.remove()
 
           if (key.isAcceptable) {
+            // 处理新连接，将连接socketChannel分配给指定的processors处理
             accept(key).foreach { socketChannel =>
               // Assign the channel to the next processor (using round-robin) to which the
               // channel can be added without blocking. If newConnections queue is full on
@@ -803,6 +816,8 @@ private[kafka] object Processor {
 }
 
 /**
+ * Processor线程
+ *
  * Thread that processes all requests from a single connection. There are N of these running in parallel
  * each of which has its own selector
  *
@@ -908,13 +923,17 @@ private[kafka] class Processor(
     try {
       while (shouldRun.get()) {
         try {
-          // setup any new connections that have been queued up
+          // setup any new connections that have been queued up 将新连接的读事件注册到selector
           configureNewConnections()
-          // register any new responses for writing
+          // register any new responses for writing 写响应
           processNewResponses()
+          // 轮询
           poll()
+          // 接收请求数据，将请求添加到kafka.network.RequestChannel.requestQueue
           processCompletedReceives()
+          // 写完成的回调
           processCompletedSends()
+          // 维护连接
           processDisconnected()
           closeExcessConnections()
         } catch {
@@ -1052,6 +1071,7 @@ private[kafka] class Processor(
                       apiVersionsRequest.data.clientSoftwareVersion))
                   }
                 }
+                // 将请求添加到kafka.network.RequestChannel.requestQueue
                 requestChannel.sendRequest(req)
                 selector.mute(connectionId)
                 handleChannelMuteEvent(connectionId, ChannelMuteEvent.REQUEST_RECEIVED)
@@ -1149,6 +1169,8 @@ private[kafka] class Processor(
   }
 
   /**
+   * 将新连接添加到processor的newConnections
+   *
    * Queue up a new connection for reading
    */
   def accept(socketChannel: SocketChannel,
@@ -1165,8 +1187,10 @@ private[kafka] class Processor(
       } else
         false
     }
-    if (accepted)
+    if (accepted) {
+      // 唤醒processor
       wakeup()
+    }
     accepted
   }
 

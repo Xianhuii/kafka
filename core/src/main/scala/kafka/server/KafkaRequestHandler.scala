@@ -83,6 +83,8 @@ object KafkaRequestHandler {
 }
 
 /**
+ * 请求处理器
+ *
  * A thread that answers kafka requests.
  */
 class KafkaRequestHandler(
@@ -102,6 +104,7 @@ class KafkaRequestHandler(
   private val requestLocal = RequestLocal.withThreadConfinedCaching
   @volatile private var stopped = false
 
+  // 处理请求
   def run(): Unit = {
     threadRequestChannel.set(requestChannel)
     while (!stopped) {
@@ -111,6 +114,7 @@ class KafkaRequestHandler(
       // time should be discounted by # threads.
       val startSelectTime = time.nanoseconds
 
+      // 阻塞获取请求
       val req = requestChannel.receiveRequest(300)
       val endTime = time.nanoseconds
       val idleTime = endTime - startSelectTime
@@ -125,6 +129,7 @@ class KafkaRequestHandler(
           completeShutdown()
           return
 
+        // 处理回调
         case callback: RequestChannel.CallbackRequest =>
           val originalRequest = callback.originalRequest
           try {
@@ -155,6 +160,7 @@ class KafkaRequestHandler(
             threadCurrentRequest.remove()
           }
 
+        // 处理请求
         case request: RequestChannel.Request =>
           try {
             request.requestDequeueTimeNanos = endTime
@@ -220,6 +226,9 @@ class KafkaRequestHandlerPoolFactory {
   def aggregateThreadCount: Int = aggregateThreads.get()
 }
 
+/**
+ * 请求处理器池：负责创建和维护KafkaRequestHandler
+ */
 class KafkaRequestHandlerPool(
   val aggregateThreads: AtomicInteger,
   val requestHandlerAvgIdleMetricName: String,
@@ -254,6 +263,7 @@ class KafkaRequestHandlerPool(
     createHandler(i)
   }
 
+  // 创建请求处理器
   private def createHandler(id: Int): Unit = {
     runnables += new KafkaRequestHandler(
       id,

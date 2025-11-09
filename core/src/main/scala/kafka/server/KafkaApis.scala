@@ -146,6 +146,8 @@ class KafkaApis(val requestChannel: RequestChannel,
   }
 
   /**
+   * 处理请求
+   *
    * Top-level method that handles all requests and multiplexes to the right api
    */
   override def handle(request: RequestChannel.Request, requestLocal: RequestLocal): Unit = {
