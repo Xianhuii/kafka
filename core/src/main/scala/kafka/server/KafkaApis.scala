@@ -85,21 +85,22 @@ import scala.jdk.CollectionConverters._
 import scala.jdk.javaapi.OptionConverters
 
 /**
+ * 统一请求入口
  * Logic to handle the various Kafka requests
  */
-class KafkaApis(val requestChannel: RequestChannel,
+class KafkaApis(val requestChannel: RequestChannel, // 请求通道，接收和分发Socket请求
                 val forwardingManager: ForwardingManager,
-                val replicaManager: ReplicaManager,
-                val groupCoordinator: GroupCoordinator,
-                val txnCoordinator: TransactionCoordinator,
+                val replicaManager: ReplicaManager, // 管理副本状态，处理生产/消费请求的日志读写
+                val groupCoordinator: GroupCoordinator, // 管理消费者组状态与位移提交
+                val txnCoordinator: TransactionCoordinator, // 处理事务提交与回滚
                 val shareCoordinator: ShareCoordinator,
                 val autoTopicCreationManager: AutoTopicCreationManager,
                 val brokerId: Int,
                 val config: KafkaConfig,
                 val configRepository: ConfigRepository,
-                val metadataCache: MetadataCache,
+                val metadataCache: MetadataCache, // 缓存集群元数据（如Broker列表、Topic分区信息）
                 val metrics: Metrics,
-                val authorizerPlugin: Option[Plugin[Authorizer]],
+                val authorizerPlugin: Option[Plugin[Authorizer]], // 权限校验插件，支持ACL控制
                 val quotas: QuotaManagers,
                 val fetchManager: FetchManager,
                 val sharePartitionManager: SharePartitionManager,
@@ -146,7 +147,7 @@ class KafkaApis(val requestChannel: RequestChannel,
   }
 
   /**
-   * 处理请求
+   * 总入口方法，根据apiKey路由请求到具体处理逻辑
    *
    * Top-level method that handles all requests and multiplexes to the right api
    */

@@ -42,39 +42,72 @@ import static org.apache.kafka.common.protocol.types.Type.RECORDS;
  * Identifiers for all the Kafka APIs
  */
 public enum ApiKeys {
+    // 生产消息请求
     PRODUCE(ApiMessageType.PRODUCE),
+    // 消费消息请求
     FETCH(ApiMessageType.FETCH),
+    // 获取分区偏移量请求
     LIST_OFFSETS(ApiMessageType.LIST_OFFSETS),
+    // 获取主题/分区元数据请求
     METADATA(ApiMessageType.METADATA),
+    // Leader与ISR信息请求
     LEADER_AND_ISR(ApiMessageType.LEADER_AND_ISR, true),
+    // 停止副本请求
     STOP_REPLICA(ApiMessageType.STOP_REPLICA, true),
+    // 更新元数据请求
     UPDATE_METADATA(ApiMessageType.UPDATE_METADATA, true),
     CONTROLLED_SHUTDOWN(ApiMessageType.CONTROLLED_SHUTDOWN, true),
+    // 提交消费偏移量请求
     OFFSET_COMMIT(ApiMessageType.OFFSET_COMMIT),
+    // 获取消费偏移量请求
     OFFSET_FETCH(ApiMessageType.OFFSET_FETCH),
+    // 查找协调者请求
     FIND_COORDINATOR(ApiMessageType.FIND_COORDINATOR),
+    // 加入消费组请求
     JOIN_GROUP(ApiMessageType.JOIN_GROUP),
+    // 消费组心跳请求
     HEARTBEAT(ApiMessageType.HEARTBEAT),
+    // 离开消费组请求
     LEAVE_GROUP(ApiMessageType.LEAVE_GROUP),
+    // 同步消费组请求
     SYNC_GROUP(ApiMessageType.SYNC_GROUP),
+    // 描述消费组请求
     DESCRIBE_GROUPS(ApiMessageType.DESCRIBE_GROUPS),
+    // 列出消费组请求
     LIST_GROUPS(ApiMessageType.LIST_GROUPS),
+    // SASL握手请求
     SASL_HANDSHAKE(ApiMessageType.SASL_HANDSHAKE),
+    // 获取API版本请求
     API_VERSIONS(ApiMessageType.API_VERSIONS),
+    // 创建主题请求
     CREATE_TOPICS(ApiMessageType.CREATE_TOPICS, false, true),
+    // 删除主题请求
     DELETE_TOPICS(ApiMessageType.DELETE_TOPICS, false, true),
+    // 删除消息请求
     DELETE_RECORDS(ApiMessageType.DELETE_RECORDS),
+    // 初始化生产者ID请求
     INIT_PRODUCER_ID(ApiMessageType.INIT_PRODUCER_ID),
+    // 获取Leader epoch偏移量请求
     OFFSET_FOR_LEADER_EPOCH(ApiMessageType.OFFSET_FOR_LEADER_EPOCH),
+    // 添加分区到事务请求
     ADD_PARTITIONS_TO_TXN(ApiMessageType.ADD_PARTITIONS_TO_TXN, false, false),
+    // 添加偏移量到事务请求
     ADD_OFFSETS_TO_TXN(ApiMessageType.ADD_OFFSETS_TO_TXN, false, false),
+    // 结束事务请求
     END_TXN(ApiMessageType.END_TXN, false, false),
+    // 写入事务标记请求
     WRITE_TXN_MARKERS(ApiMessageType.WRITE_TXN_MARKERS, true, false),
+    // 事务提交偏移量请求
     TXN_OFFSET_COMMIT(ApiMessageType.TXN_OFFSET_COMMIT, false, false),
+    // 描述ACL请求
     DESCRIBE_ACLS(ApiMessageType.DESCRIBE_ACLS),
+    // 创建ACL请求
     CREATE_ACLS(ApiMessageType.CREATE_ACLS, false, true),
+    // 删除ACL请求
     DELETE_ACLS(ApiMessageType.DELETE_ACLS, false, true),
+    // 描述配置请求
     DESCRIBE_CONFIGS(ApiMessageType.DESCRIBE_CONFIGS),
+    // 修改配置请求
     ALTER_CONFIGS(ApiMessageType.ALTER_CONFIGS, false, true),
     ALTER_REPLICA_LOG_DIRS(ApiMessageType.ALTER_REPLICA_LOG_DIRS),
     DESCRIBE_LOG_DIRS(ApiMessageType.DESCRIBE_LOG_DIRS),
