@@ -28,6 +28,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
+ * 辞职状态
+ *
  * This state represents a leader which has fenced itself either because it
  * is shutting down or because it has encountered a soft failure of some sort.
  * No writes are accepted in this state and we are not permitted to vote for

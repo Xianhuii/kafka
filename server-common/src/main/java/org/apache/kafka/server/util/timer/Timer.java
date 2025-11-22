@@ -18,6 +18,7 @@ package org.apache.kafka.server.util.timer;
 
 public interface Timer extends AutoCloseable {
     /**
+     * 添加任务
      * Add a new task to this executor. It will be executed after the task's delay
      * (beginning from the time of submission)
      * @param timerTask the task to add
@@ -25,6 +26,7 @@ public interface Timer extends AutoCloseable {
     void add(TimerTask timerTask);
 
     /**
+     * 推进时间，触发任务执行
      * Advance the internal clock, executing any tasks whose expiration has been
      * reached within the duration of the passed timeout.
      * @param timeoutMs the time to advance in milliseconds
@@ -33,6 +35,7 @@ public interface Timer extends AutoCloseable {
     boolean advanceClock(long timeoutMs) throws InterruptedException;
 
     /**
+     * 获取待执行任务数量
      * Get the number of tasks pending execution
      * @return the number of tasks
      */

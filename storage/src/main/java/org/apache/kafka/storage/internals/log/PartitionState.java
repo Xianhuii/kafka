@@ -21,6 +21,7 @@ import org.apache.kafka.metadata.LeaderRecoveryState;
 import java.util.Set;
 
 /**
+ * 分区状态（ISR）
  * Represents the state of a partition, including its In-Sync Replicas (ISR) and leader recovery state.
  */
 public interface PartitionState {

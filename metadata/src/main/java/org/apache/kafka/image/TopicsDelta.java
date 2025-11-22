@@ -233,11 +233,17 @@ public final class TopicsDelta {
      * @return the LocalReplicaChanges that cover changes in the broker
      */
     public LocalReplicaChanges localChanges(int brokerId) {
+        // partitions for which the broker is not a replica anymore
         Set<TopicPartition> deletes = new HashSet<>();
+        // partitions for which the broker is now a leader (leader epoch bump on the leader)
         Map<TopicPartition, LocalReplicaChanges.PartitionInfo> electedLeaders = new HashMap<>();
+        // partitions for which the isr or replicas change if the broker is a leader (partition epoch bump on the leader)
         Map<TopicPartition, LocalReplicaChanges.PartitionInfo> leaders = new HashMap<>();
+        // partitions for which the broker is now a follower or follower with isr or replica updates (partition epoch bump on follower)
         Map<TopicPartition, LocalReplicaChanges.PartitionInfo> followers = new HashMap<>();
+        // a map of topic names to topic IDs in leaders and followers changes
         Map<String, Uuid> topicIds = new HashMap<>();
+        // partitions for which directory id changes or newly added to the broker
         Map<TopicIdPartition, Uuid> directoryIds = new HashMap<>();
 
         for (TopicDelta delta : changedTopics.values()) {

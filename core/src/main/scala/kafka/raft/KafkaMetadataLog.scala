@@ -53,7 +53,7 @@ import scala.collection.mutable
 import scala.jdk.OptionConverters.{RichOption, RichOptional}
 
 final class KafkaMetadataLog private (
-  val log: UnifiedLog,
+  val log: UnifiedLog, // __cluster_metadata
   time: Time,
   scheduler: Scheduler,
   // Access to this object needs to be synchronized because it is used by the snapshotting thread to notify the

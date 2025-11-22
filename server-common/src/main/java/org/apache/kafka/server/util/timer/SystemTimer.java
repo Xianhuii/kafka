@@ -30,13 +30,17 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class SystemTimer implements Timer {
     public static final String SYSTEM_TIMER_THREAD_PREFIX = "executor-";
 
-    // timeout timer
+    // 执行到期任务的线程池（单线程）
     private final ExecutorService taskExecutor;
+    // 存储所有活跃的时间格，用于精准推进时间轮
     private final DelayQueue<TimerTaskList> delayQueue;
+    // 统计所有层级时间轮中的任务总数。
     private final AtomicInteger taskCounter;
+    // 最底层时间轮的引用，其他层级通过overflowWheel间接引用。
     private final TimingWheel timingWheel;
 
     // Locks used to protect data structures while ticking
+    // 保护currentTime的并发修改。
     private final ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     private final ReentrantReadWriteLock.ReadLock readLock = readWriteLock.readLock();
     private final ReentrantReadWriteLock.WriteLock writeLock = readWriteLock.writeLock();
@@ -64,6 +68,10 @@ public class SystemTimer implements Timer {
         );
     }
 
+    /**
+     * 添加延迟任务
+     * @param timerTask the task to add
+     */
     public void add(TimerTask timerTask) {
         readLock.lock();
         try {
@@ -74,8 +82,10 @@ public class SystemTimer implements Timer {
     }
 
     private void addTimerTaskEntry(TimerTaskEntry timerTaskEntry) {
+        // 添加到时间轮
         if (!timingWheel.add(timerTaskEntry)) {
             // Already expired or cancelled
+            // 如果添加时间轮失败，并且没有取消，说明已过期，直接提交给执行器执行
             if (!timerTaskEntry.cancelled()) {
                 taskExecutor.submit(timerTaskEntry.timerTask);
             }
@@ -87,12 +97,15 @@ public class SystemTimer implements Timer {
      * waits up to timeoutMs before giving up.
      */
     public boolean advanceClock(long timeoutMs) throws InterruptedException {
+        // 弹出对应的bucket
         TimerTaskList bucket = delayQueue.poll(timeoutMs, TimeUnit.MILLISECONDS);
         if (bucket != null) {
             writeLock.lock();
             try {
                 while (bucket != null) {
+                    // 滚动时间
                     timingWheel.advanceClock(bucket.getExpiration());
+                    // 滚动任务，将任务重新插入时间轮，如果过期则触发执行
                     bucket.flush(this::addTimerTaskEntry);
                     bucket = delayQueue.poll();
                 }

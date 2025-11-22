@@ -42,6 +42,8 @@ public interface PartitionWriter {
     }
 
     /**
+     * 注册监听起
+     * <p>
      * Register a {{@link Listener}}.
      *
      * @param tp        The partition to register the listener to.
@@ -53,6 +55,8 @@ public interface PartitionWriter {
     );
 
     /**
+     * 注销监听起
+     * <p>
      * Deregister a {{@link Listener}}.
      *
      * @param tp        The partition to deregister the listener from.
@@ -74,6 +78,8 @@ public interface PartitionWriter {
     );
 
     /**
+     * 往topic分区写记录
+     * <p>
      * Write records to the partitions.
      *
      * @param tp                The partition to write records to.
@@ -109,6 +115,8 @@ public interface PartitionWriter {
     ) throws KafkaException;
 
     /**
+     * 删除topic分区的记录
+     * <p>
      * Delete records from a topic partition until specified offset
      * @param tp                    The partition to delete records from
      * @param deleteBeforeOffset    Offset to delete until, starting from the beginning

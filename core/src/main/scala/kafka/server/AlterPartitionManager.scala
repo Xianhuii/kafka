@@ -100,6 +100,7 @@ class DefaultAlterPartitionManager(
 ) extends AlterPartitionManager with Logging {
 
   // Used to allow only one pending ISR update per partition (visible for testing)
+  // 待发送的ISR变更请求
   private[server] val unsentIsrUpdates = new ConcurrentHashMap[TopicIdPartition, AlterPartitionItem]()
 
   // Used to allow only one in-flight request at a time
@@ -113,6 +114,7 @@ class DefaultAlterPartitionManager(
     controllerChannelManager.shutdown()
   }
 
+  // 提交分区ISR变更任务
   override def submit(
     topicIdPartition: TopicIdPartition,
     leaderAndIsr: LeaderAndIsr
@@ -129,12 +131,14 @@ class DefaultAlterPartitionManager(
     future
   }
 
+  // 广播ISR变更
   private[server] def maybePropagateIsrChanges(): Unit = {
     // Send all pending items if there is not already a request in-flight.
     if (!unsentIsrUpdates.isEmpty && inflightRequest.compareAndSet(false, true)) {
       // Copy current unsent ISRs but don't remove from the map, they get cleared in the response handler
       val inflightAlterPartitionItems = new ListBuffer[AlterPartitionItem]()
       unsentIsrUpdates.values.forEach(item => inflightAlterPartitionItems.append(item))
+      // 发送请求
       sendRequest(inflightAlterPartitionItems.toSeq)
     }
   }
@@ -185,6 +189,7 @@ class DefaultAlterPartitionManager(
                 maybePropagateIsrChanges()
               case _ =>
                 // If we received a top-level error from the controller, retry the request in the near future
+                // 定时广播ISR变更
                 scheduler.scheduleOnce("send-alter-partition", () => maybePropagateIsrChanges(), 50)
             }
         }

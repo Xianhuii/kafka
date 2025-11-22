@@ -18,7 +18,7 @@ package org.apache.kafka.server.util.timer;
 
 public abstract class TimerTask implements Runnable {
     private volatile TimerTaskEntry timerTaskEntry;
-    // timestamp in millisecond
+    // timestamp in millisecond 延迟时间
     public final long delayMs;
 
     public TimerTask(long delayMs) {

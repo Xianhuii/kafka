@@ -28,6 +28,8 @@ import java.util.OptionalLong;
 import java.util.Random;
 
 /**
+ * 维护每个节点的请求状态
+ *
  * The request manager keeps tracks of the connection with remote replicas.
  *
  * When sending a request update this type by calling {@code onRequestSent(Node, long, long)}. When
@@ -42,10 +44,14 @@ import java.util.Random;
  * {@code retryBackoffMs}.
  */
 public class RequestManager {
+    // 维护请求中的连接状态
     private final Map<String, ConnectionState> connections = new HashMap<>();
+    // 维护连接地址
     private final ArrayList<Node> bootstrapServers;
 
+    // 重试退让时间
     private final int retryBackoffMs;
+    // 请求超时时间
     private final int requestTimeoutMs;
     private final Random random;
 
@@ -272,13 +278,16 @@ public class RequestManager {
         connections.remove(node.idString());
     }
 
+    /**
+     * 重置所有连接状态
+     */
     public void resetAll() {
         connections.clear();
     }
 
     private enum State {
-        AWAITING_RESPONSE,
-        BACKING_OFF,
+        AWAITING_RESPONSE, // 等待响应
+        BACKING_OFF, // 失败退让
         READY
     }
 

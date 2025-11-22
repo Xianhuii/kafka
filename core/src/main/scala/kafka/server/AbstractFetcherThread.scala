@@ -54,11 +54,13 @@ import scala.jdk.OptionConverters.{RichOption, RichOptional}
 import scala.math._
 
 /**
+ * 从同一个broker获取多个分区数据的线程抽象类
+ *
  * Abstract class for fetching data from multiple partitions from the same broker.
  */
 abstract class AbstractFetcherThread(name: String,
-                                     clientId: String,
-                                     val leader: LeaderEndPoint,
+                                     clientId: String, // 当前节点的客户端id
+                                     val leader: LeaderEndPoint, // broker leader信息
                                      failedPartitions: FailedPartitions,
                                      val fetchTierStateMachine: TierStateMachine,
                                      fetchBackOffMs: Int = 0,
@@ -81,7 +83,7 @@ abstract class AbstractFetcherThread(name: String,
 
   /* callbacks to be defined in subclass */
 
-  // process fetched data
+  // process fetched data 处理拉取到的数据
   protected def processPartitionData(
     topicPartition: TopicPartition,
     fetchOffset: Long,
@@ -120,6 +122,7 @@ abstract class AbstractFetcherThread(name: String,
 
   private def maybeFetch(): Unit = {
     val fetchRequestOpt = inLock(partitionMapLock) {
+      // 拉取数据
       val result = leader.buildFetch(partitionStates.partitionStateMap)
       val fetchRequestOpt = result.result
       val partitionsWithError = result.partitionsWithError
@@ -135,6 +138,7 @@ abstract class AbstractFetcherThread(name: String,
     }
 
     fetchRequestOpt.ifPresent(replicaFetch =>
+      // 处理数据
       processFetchRequest(replicaFetch.partitionData, replicaFetch.fetchRequest)
     )
   }

@@ -72,22 +72,22 @@ import static org.apache.kafka.coordinator.common.runtime.CoordinatorRuntime.Coo
 
 /**
  * The CoordinatorRuntime provides a framework to implement coordinators such as the group coordinator
- * or the transaction coordinator.
- *
+ * or the transaction coordinator. 提供实现coordinator的框架
+ * <p>
  * The runtime framework maps each underlying partitions (e.g. __consumer_offsets) that that broker is a
  * leader of to a coordinator replicated state machine. A replicated state machine holds the hard and soft
  * state of all the objects (e.g. groups or offsets) assigned to the partition. The hard state is stored in
  * timeline datastructures backed by a SnapshotRegistry. The runtime supports two type of operations
  * on state machines: (1) Writes and (2) Reads.
- *
+ * <p>
  * (1) A write operation, aka a request, can read the full and potentially **uncommitted** state from state
  * machine to handle the operation. A write operation typically generates a response and a list of
  * records. The records are applied to the state machine and persisted to the partition. The response
  * is parked until the records are committed and delivered when they are.
- *
+ * <p>
  * (2) A read operation, aka a request, can only read the committed state from the state machine to handle
  * the operation. A read operation typically generates a response that is immediately completed.
- *
+ * <p>
  * The runtime framework exposes an asynchronous, future based, API to the world. All the operations
  * are executed by an CoordinatorEventProcessor. The processor guarantees that operations for a
  * single partition or state machine are not processed concurrently.
@@ -531,6 +531,8 @@ public class CoordinatorRuntime<S extends CoordinatorShard<U>, U> implements Aut
     }
 
     /**
+     * coordinator状态机的元数据
+     * <p>
      * CoordinatorContext holds all the metadata around a coordinator state machine.
      */
     class CoordinatorContext {
@@ -1944,17 +1946,17 @@ public class CoordinatorRuntime<S extends CoordinatorShard<U>, U> implements Aut
     private final Duration defaultWriteTimeout;
 
     /**
-     * The coordinators keyed by topic partition.
+     * The coordinators keyed by topic partition. topic分区的CoordinatorContext
      */
     private final ConcurrentHashMap<TopicPartition, CoordinatorContext> coordinators;
 
     /**
-     * The event processor used by the runtime.
+     * The event processor used by the runtime. 事件处理器
      */
     private final CoordinatorEventProcessor processor;
 
     /**
-     * The partition writer used by the runtime to persist records.
+     * The partition writer used by the runtime to persist records. 分区数据Writer
      */
     private final PartitionWriter partitionWriter;
 
@@ -2077,6 +2079,7 @@ public class CoordinatorRuntime<S extends CoordinatorShard<U>, U> implements Aut
     }
 
     /**
+     * 入队
      * Enqueues a new event at the end of the processing queue.
      *
      * @param event The event.
@@ -2091,6 +2094,7 @@ public class CoordinatorRuntime<S extends CoordinatorShard<U>, U> implements Aut
     }
 
     /**
+     * 入队
      * Enqueues a new event at the front of the processing queue.
      *
      * @param event The event.
@@ -2105,6 +2109,8 @@ public class CoordinatorRuntime<S extends CoordinatorShard<U>, U> implements Aut
     }
 
     /**
+     * 创建或返回topic分区对应的CoordinatorContext
+     *
      * @return The coordinator context or a new context if it does not exist.
      * Package private for testing.
      */
@@ -2113,6 +2119,8 @@ public class CoordinatorRuntime<S extends CoordinatorShard<U>, U> implements Aut
     }
 
     /**
+     * 获取topic分区对应的CoordinatorContext，如果为空抛出异常
+     *
      * @return The coordinator context or thrown an exception if it does
      * not exist.
      * @throws NotCoordinatorException
@@ -2159,6 +2167,8 @@ public class CoordinatorRuntime<S extends CoordinatorShard<U>, U> implements Aut
     }
 
     /**
+     * 添加写操作
+     * <p>
      * Schedules a write operation.
      *
      * @param name      The name of the write operation.
@@ -2185,6 +2195,8 @@ public class CoordinatorRuntime<S extends CoordinatorShard<U>, U> implements Aut
     }
 
     /**
+     * 添加写操作
+     * <p>
      * Schedule a write operation for each coordinator.
      *
      * @param name      The name of the write operation.

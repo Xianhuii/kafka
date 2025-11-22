@@ -95,10 +95,22 @@ public class ReplicationConfigs {
     public static final long REPLICA_HIGH_WATERMARK_CHECKPOINT_INTERVAL_MS_DEFAULT = 5000L;
     public static final String REPLICA_HIGH_WATERMARK_CHECKPOINT_INTERVAL_MS_DOC = "The frequency with which the high watermark is saved out to disk";
 
+    /**
+     * 定义 Broker 处理 Fetch 请求时，每处理多少个请求后触发一次 Purgatory 清理。
+     */
     public static final String FETCH_PURGATORY_PURGE_INTERVAL_REQUESTS_CONFIG = "fetch.purgatory.purge.interval.requests";
     public static final int FETCH_PURGATORY_PURGE_INTERVAL_REQUESTS_DEFAULT = 1000;
     public static final String FETCH_PURGATORY_PURGE_INTERVAL_REQUESTS_DOC = "The purge interval (in number of requests) of the fetch request purgatory";
 
+    /**
+     * 定义 Broker 处理 Producer 请求时，每处理多少个请求后触发一次 Purgatory 清理。
+     * Purgatory（炼狱）是 Broker 用于暂存无法立即响应的请求的临时存储区，例如：
+     *  需要等待 Leader 确认的 ACK=-1或 ACK=1的消息。
+     *  需要满足特定条件（如超时时间）的请求。
+     * Broker 会定期扫描 Purgatory，移除已完成的请求（如消息成功写入 ISR），释放内存资源。
+     * 该参数通过控制清理频率，平衡 内存占用 和 清理开销。
+     * 默认值：1000（每处理 1000 个请求后清理一次）。
+     */
     public static final String PRODUCER_PURGATORY_PURGE_INTERVAL_REQUESTS_CONFIG = "producer.purgatory.purge.interval.requests";
     public static final int PRODUCER_PURGATORY_PURGE_INTERVAL_REQUESTS_DEFAULT = 1000;
     public static final String PRODUCER_PURGATORY_PURGE_INTERVAL_REQUESTS_DOC = "The purge interval (in number of requests) of the producer request purgatory";

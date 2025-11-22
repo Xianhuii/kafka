@@ -260,11 +260,14 @@ import static org.apache.kafka.coordinator.group.streams.StreamsGroupMember.hasA
 
 
 /**
- * The GroupMetadataManager manages the metadata of all classic and consumer groups. It holds
- * the hard and the soft state of the groups. This class has two kinds of methods:
+ * The GroupMetadataManager manages the metadata of all classic and consumer groups.
+ * <p>
+ * It holds the hard and the soft state of the groups. This class has two kinds of methods:
+ * <p>
  * 1) The request handlers which handle the requests and generate a response and records to
  *    mutate the hard state. Those records will be written by the runtime and applied to the
  *    hard state via the replay methods.
+ * <p>
  * 2) The replay methods which apply records to the hard state. Those are used in the request
  *    handling as well as during the initial loading of the records from the partitions.
  */
@@ -456,12 +459,12 @@ public class GroupMetadataManager {
     private final ConsumerGroupPartitionAssignor defaultConsumerGroupAssignor;
 
     /**
-     * The classic and consumer groups keyed by their name.
+     * The classic and consumer groups keyed by their name. groupName-group缓存
      */
     private final TimelineHashMap<String, Group> groups;
 
     /**
-     * The group ids keyed by topic names.
+     * The group ids keyed by topic names. topicName-groupId缓存
      */
     private final TimelineHashMap<String, TimelineHashSet<String>> groupsByTopics;
 
@@ -586,6 +589,8 @@ public class GroupMetadataManager {
     }
 
     /**
+     * 获取group列表
+     * <p>
      * Get the Group List.
      *
      * @param statesFilter      The states of the groups we want to list.
@@ -6170,6 +6175,7 @@ public class GroupMetadataManager {
     }
 
     /**
+     * 处理JoinGroup请求
      * Handle a JoinGroupRequest.
      *
      * @param context        The request context.
@@ -7876,6 +7882,7 @@ public class GroupMetadataManager {
     }
 
     /**
+     * 处理LeaveGroup请求
      * Handle a classic LeaveGroupRequest.
      *
      * @param context        The request context.

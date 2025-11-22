@@ -173,10 +173,12 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
     public static final int MAX_BATCH_SIZE_BYTES = 8 * 1024 * 1024;
     public static final int MAX_FETCH_SIZE_BYTES = MAX_BATCH_SIZE_BYTES;
 
+    // 当前节点id
     private final OptionalInt nodeId;
     private final Uuid nodeDirectoryId;
     private final AtomicReference<GracefulShutdown> shutdown = new AtomicReference<>();
     private final LogContext logContext;
+    // slf4j日志
     private final Logger logger;
     private final Time time;
     private final int fetchMaxWaitMs;
@@ -185,6 +187,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
     private final Endpoints localListeners;
     private final SupportedVersionRange localSupportedKRaftVersion;
     private final NetworkChannel channel;
+    // kraft-combined-logs/__cluster_metadata-0
     private final ReplicatedLog log;
     private final Random random;
     private final FuturePurgatory<Long> appendPurgatory;
@@ -476,7 +479,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
         }
     }
 
-    // 初始化RequestManager
+    // 初始化
     public void initialize(
         Map<Integer, InetSocketAddress> voterAddresses,
         QuorumStateStore quorumStateStore,
@@ -489,7 +492,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
 
         kafkaRaftMetrics = new KafkaRaftMetrics(metrics, "raft");
 
-        // 元数据状态及
+        // 元数据状态机
         partitionState = new KRaftControlRecordStateMachine(
             staticVoters,
             log,
@@ -642,11 +645,15 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
         return new OffsetAndEpoch(log.endOffset().offset(), log.lastFetchedEpoch());
     }
 
+    /**
+     * 重置与其他节点的请求
+     */
     private void resetConnections() {
         requestManager.resetAll();
     }
 
     private void onBecomeLeader(long currentTimeMs) {
+        // 当前最新的endOffset作为epoch的epochStartOffset
         long endOffset = log.endOffset().offset();
 
         BatchAccumulator<T> accumulator = new BatchAccumulator<>(
@@ -661,6 +668,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
             serde
         );
 
+        // 晋升成Leader
         LeaderState<T> state = quorum.transitionToLeader(endOffset, accumulator);
 
         log.initializeLeaderEpoch(quorum.epoch());
@@ -680,7 +688,11 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
         log.flush(false);
     }
 
+    /**
+     * 竞选成Leader
+     */
     private boolean maybeTransitionToLeader(CandidateState state, long currentTimeMs) {
+        // 如果CandidateState收到绝大部分投票，晋升为Leader
         if (state.epochElection().isVoteGranted()) {
             onBecomeLeader(currentTimeMs);
             return true;
@@ -2809,18 +2821,28 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
     private void handleRequest(RaftRequest.Inbound request, long currentTimeMs) {
         ApiKeys apiKey = ApiKeys.forId(request.data().apiKey());
         final CompletableFuture<? extends ApiMessage> responseFuture = switch (apiKey) {
+            // 获取信息
             case FETCH -> handleFetchRequest(request, currentTimeMs);
+            // 竞选投票请求
             case VOTE -> completedFuture(handleVoteRequest(request));
+            // 开启新的epoch
             case BEGIN_QUORUM_EPOCH -> completedFuture(handleBeginQuorumEpochRequest(request, currentTimeMs));
+            // 结束epoch
             case END_QUORUM_EPOCH -> completedFuture(handleEndQuorumEpochRequest(request, currentTimeMs));
+            // 获取quorum信息
             case DESCRIBE_QUORUM -> completedFuture(handleDescribeQuorumRequest(request, currentTimeMs));
+            // 获取快照
             case FETCH_SNAPSHOT -> completedFuture(handleFetchSnapshotRequest(request, currentTimeMs));
+            // 添加voter
             case ADD_RAFT_VOTER -> handleAddVoterRequest(request, currentTimeMs);
+            // 移除voter
             case REMOVE_RAFT_VOTER -> handleRemoveVoterRequest(request, currentTimeMs);
+            // 更新voter
             case UPDATE_RAFT_VOTER -> handleUpdateVoterRequest(request, currentTimeMs);
             default -> throw new IllegalArgumentException("Unexpected request type " + apiKey);
         };
 
+        // 异步响应
         responseFuture.whenComplete((response, exception) -> {
             ApiMessage message = response;
             if (message == null) {
@@ -2853,6 +2875,8 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
     }
 
     /**
+     * 尝试发送请求
+     *
      * Attempt to send a request.
      *
      * Return if the request was sent and the time to wait before the request can be retried.
@@ -2870,13 +2894,16 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
     )  {
         var requestSent = false;
 
+        // 如果目标节点正在重试，返回下次重试的时间间隔
         if (requestManager.isBackingOff(destination, currentTimeMs)) {
             long remainingBackoffMs = requestManager.remainingBackoffMs(destination, currentTimeMs);
             logger.debug("Connection for {} is backing off for {} ms", destination, remainingBackoffMs);
             return RequestSendResult.of(requestSent, remainingBackoffMs);
         }
 
+        // 如果目标节点可用，进行发送请求
         if (requestManager.isReady(destination, currentTimeMs)) {
+            // 获取递增ID
             int correlationId = channel.newCorrelationId();
             ApiMessage request = requestSupplier.get();
 
@@ -2887,6 +2914,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
                 currentTimeMs
             );
 
+            // 请求完成回调，处理响应
             requestMessage.completion.whenComplete((response, exception) -> {
                 if (exception != null) {
                     ApiKeys api = ApiKeys.forId(request.apiKey());
@@ -2900,9 +2928,11 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
                     );
                 }
 
+                // 将响应添加到消息队列
                 messageQueue.add(response);
             });
 
+            // 发送请求
             requestManager.onRequestSent(destination, correlationId, currentTimeMs);
             channel.send(requestMessage);
             requestSent = true;
@@ -2911,6 +2941,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
 
         return RequestSendResult.of(
             requestSent,
+            // 获取下次可用时间
             requestManager.remainingRequestTimeMs(destination, currentTimeMs)
         );
     }
@@ -2927,6 +2958,9 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
         );
     }
 
+    /**
+     * 遍历所有节点，发送请求，返回最小的下次可用时间
+     */
     private long maybeSendRequests(
         long currentTimeMs,
         Set<Node> destinations,
@@ -3005,6 +3039,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
             .setReplicaState(new FetchRequestData.ReplicaState().setReplicaId(quorum.localIdOrSentinel()));
     }
 
+    // 发送FetchRequestData请求
     private long maybeSendFetchToAnyBootstrap(long currentTimeMs) {
         Optional<Node> readyNode = requestManager.findReadyBootstrapServer(currentTimeMs);
         return readyNode.map(
@@ -3144,6 +3179,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
 
     private long pollResigned(long currentTimeMs) {
         ResignedState state = quorum.resignedStateOrThrow();
+        // 发送任期结束的消息
         long endQuorumBackoffMs = maybeSendRequests(
             currentTimeMs,
             partitionState
@@ -3175,6 +3211,7 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
 
     private long pollLeader(long currentTimeMs) {
         LeaderState<T> state = quorum.leaderStateOrThrow();
+        // 触发领导者变更事件
         maybeFireLeaderChange(state);
 
         long timeUntilCheckQuorumExpires = state.timeUntilCheckQuorumExpires(currentTimeMs);
@@ -3235,6 +3272,10 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
         return Long.MAX_VALUE;
     }
 
+    /**
+     * 发送竞选请求
+     * 超时：切换为预候选者
+     */
     private long pollCandidate(long currentTimeMs) {
         CandidateState state = quorum.candidateStateOrThrow();
         GracefulShutdown shutdown = this.shutdown.get();
@@ -3257,11 +3298,16 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
         }
     }
 
+    /**
+     * 发送竞选请求
+     * 超时：切换成Follower或Unattached状态
+     */
     private long pollProspective(long currentTimeMs) {
         ProspectiveState state = quorum.prospectiveStateOrThrow();
         GracefulShutdown shutdown = this.shutdown.get();
 
         if (shutdown != null) {
+            // 发送竞选Leader请求
             long minRequestBackoffMs = maybeSendVoteRequests(state, currentTimeMs);
             return Math.min(shutdown.remainingTimeMs(), minRequestBackoffMs);
         } else if (state.hasElectionTimeoutExpired(currentTimeMs)) {
@@ -3270,9 +3316,11 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
                 "Current epoch election state: {}",
                 state.epochElection()
             );
+            // 竞选超时，切换成Follower或Unattached状态
             prospectiveTransitionAfterElectionLoss(state, currentTimeMs);
             return 0L;
         } else {
+            // 发送竞选Leader请求
             long minVoteRequestBackoffMs = maybeSendVoteRequests(state, currentTimeMs);
             return Math.min(minVoteRequestBackoffMs, state.remainingElectionTimeMs(currentTimeMs));
         }
@@ -3292,6 +3340,10 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
         }
     }
 
+    /**
+     * 作为Voter（投票者）：
+     * 作为Observer（观察者）：
+     */
     private long pollFollower(long currentTimeMs) {
         FollowerState state = quorum.followerStateOrThrow();
         if (quorum.isVoter()) {
@@ -3524,18 +3576,30 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
         return Math.min(fetchBackoffMs, state.remainingElectionTimeMs(currentTimeMs));
     }
 
+    // 触发作为不同角色时的业务
     private long pollCurrentState(long currentTimeMs) {
+        // 领导者
         if (quorum.isLeader()) {
             return pollLeader(currentTimeMs);
-        } else if (quorum.isCandidate()) {
+        }
+        // 候选者
+        else if (quorum.isCandidate()) {
             return pollCandidate(currentTimeMs);
-        } else if (quorum.isProspective()) {
+        }
+        // 预候选者：选举过程中，
+        else if (quorum.isProspective()) {
             return pollProspective(currentTimeMs);
-        } else if (quorum.isFollower()) {
+        }
+        // 跟随者
+        else if (quorum.isFollower()) {
             return pollFollower(currentTimeMs);
-        } else if (quorum.isUnattached()) {
+        }
+        // 与Leader断连的状态
+        else if (quorum.isUnattached()) {
             return pollUnattached(currentTimeMs);
-        } else if (quorum.isResigned()) {
+        }
+        // 作为Leader辞职的状态
+        else if (quorum.isResigned()) {
             return pollResigned(currentTimeMs);
         } else {
             throw new IllegalStateException("Unexpected quorum state " + quorum);
@@ -3674,9 +3738,9 @@ public final class KafkaRaftClient<T> implements RaftClient<T> {
             return;
         }
 
-        // 获取当前状态剩余时间
+        // 根据当前状态处理业务，发送对应的请求给其他节点，获取当前状态剩余时间
         long pollStateTimeoutMs = pollCurrentState(startPollTimeMs);
-        // 清除快照剩余时间
+        // 清理快照，返回下次清理间隔时间
         long cleaningTimeoutMs = snapshotCleaner.maybeClean(startPollTimeMs);
         long pollTimeoutMs = Math.min(pollStateTimeoutMs, cleaningTimeoutMs);
 

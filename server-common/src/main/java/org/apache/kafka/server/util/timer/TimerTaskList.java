@@ -26,12 +26,15 @@ import java.util.function.Consumer;
 
 class TimerTaskList implements Delayed {
     private final Time time;
+    // 当前链表中的任务数
     private final AtomicInteger taskCounter;
+    // 时间格的过期时间戳（通过CAS更新）
     private final AtomicLong expiration;
 
     // TimerTaskList forms a doubly linked cyclic list using a dummy root entry
     // root.next points to the head
     // root.prev points to the tail
+    // 哨兵节点，简化链表边界条件处理
     private final TimerTaskEntry root;
 
     TimerTaskList(

@@ -31,6 +31,9 @@ import java.util.function.Supplier;
  */
 public interface ProducerIdManager {
 
+    /**
+     * 生成唯一的生产者id
+     */
     long generateProducerId() throws Exception;
 
     static ProducerIdManager rpc(int brokerId,

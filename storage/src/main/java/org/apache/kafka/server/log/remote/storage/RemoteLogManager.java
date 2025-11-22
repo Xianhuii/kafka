@@ -137,6 +137,8 @@ import static org.apache.kafka.server.log.remote.storage.RemoteStorageMetrics.RE
 import static org.apache.kafka.server.log.remote.storage.RemoteStorageMetrics.REMOTE_LOG_READER_FETCH_RATE_AND_TIME_METRIC;
 
 /**
+ * 远程日志管理器
+ * <p>
  * This class is responsible for
  * - initializing `RemoteStorageManager` and `RemoteLogMetadataManager` instances
  * - receives any leader and follower replica events and partition stop events and act on them

@@ -169,6 +169,7 @@ class KafkaApis(val requestChannel: RequestChannel,
 
       request.header.apiKey match {
         case ApiKeys.PRODUCE => handleProduceRequest(request, requestLocal)
+        // 拉取数据请求
         case ApiKeys.FETCH => handleFetchRequest(request)
         case ApiKeys.LIST_OFFSETS => handleListOffsetRequest(request)
         case ApiKeys.METADATA => handleTopicMetadataRequest(request)
@@ -186,10 +187,14 @@ class KafkaApis(val requestChannel: RequestChannel,
         case ApiKeys.CREATE_TOPICS => forwardToController(request)
         case ApiKeys.DELETE_TOPICS => forwardToController(request)
         case ApiKeys.DELETE_RECORDS => handleDeleteRecordsRequest(request)
+        // 事务阶段一：准备阶段，初始化producerId
         case ApiKeys.INIT_PRODUCER_ID => handleInitProducerIdRequest(request, requestLocal)
         case ApiKeys.OFFSET_FOR_LEADER_EPOCH => handleOffsetForLeaderEpochRequest(request)
+        // 事务阶段一：准备阶段，将分区加入事务，确保后续消息可追踪
         case ApiKeys.ADD_PARTITIONS_TO_TXN => handleAddPartitionsToTxnRequest(request, requestLocal)
+        // 提交offset到事务中
         case ApiKeys.ADD_OFFSETS_TO_TXN => handleAddOffsetsToTxnRequest(request, requestLocal)
+        // 提交/回滚事务
         case ApiKeys.END_TXN => handleEndTxnRequest(request, requestLocal)
         case ApiKeys.WRITE_TXN_MARKERS => handleWriteTxnMarkersRequest(request, requestLocal)
         case ApiKeys.TXN_OFFSET_COMMIT => handleTxnOffsetCommitRequest(request, requestLocal).exceptionally(handleError)
@@ -198,6 +203,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         case ApiKeys.DELETE_ACLS => forwardToController(request)
         case ApiKeys.ALTER_CONFIGS => handleAlterConfigsRequest(request)
         case ApiKeys.DESCRIBE_CONFIGS => handleDescribeConfigsRequest(request)
+        //
         case ApiKeys.ALTER_REPLICA_LOG_DIRS => handleAlterReplicaLogDirsRequest(request)
         case ApiKeys.DESCRIBE_LOG_DIRS => handleDescribeLogDirsRequest(request)
         case ApiKeys.SASL_AUTHENTICATE => handleSaslAuthenticateRequest(request)
@@ -555,8 +561,11 @@ class KafkaApis(val requestChannel: RequestChannel,
    * Handle a fetch request
    */
   def handleFetchRequest(request: RequestChannel.Request): Unit = {
+    // api版本
     val versionId = request.header.apiVersion
+    // 客户端id
     val clientId = request.header.clientId
+    // fetch请求内容
     val fetchRequest = request.body[FetchRequest]
     val topicNames =
       if (fetchRequest.version() >= 13)
@@ -564,9 +573,12 @@ class KafkaApis(val requestChannel: RequestChannel,
       else
         Collections.emptyMap[Uuid, String]()
 
+    // 解析请求中的Map<TopicIdPartition, PartitionData>
     val fetchData = fetchRequest.fetchData(topicNames)
+    // 解析请求中的forgottenTopics
     val forgottenTopics = fetchRequest.forgottenTopics(topicNames)
 
+    // 构造fetch上下文
     val fetchContext = fetchManager.newContext(
       fetchRequest.version,
       fetchRequest.metadata,
@@ -749,6 +761,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         Optional.empty()
       }
 
+      // 构造请求参数
       val params = new FetchParams(
         fetchRequest.replicaId,
         fetchRequest.replicaEpoch,
@@ -760,6 +773,7 @@ class KafkaApis(val requestChannel: RequestChannel,
       )
 
       // call the replica manager to fetch messages from the local replica
+      // 调用副本管理器从本地副本中拉取消息
       replicaManager.fetchMessages(
         params = params,
         fetchInfos = interesting,
@@ -1646,6 +1660,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         val enableTwoPC = initProducerIdRequest.enable2Pc()
         val keepPreparedTxn = initProducerIdRequest.keepPreparedTxn()
 
+        // 调用事务协调器，初始化producerId
         txnCoordinator.handleInitProducerId(
             transactionalId,
             initProducerIdRequest.data.transactionTimeoutMs,

@@ -382,12 +382,12 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
     private final Logger log;
 
     /**
-     * The group metadata manager.
+     * The group metadata manager. group元数据管理器
      */
     private final GroupMetadataManager groupMetadataManager;
 
     /**
-     * The offset metadata manager.
+     * The offset metadata manager. offset元数据管理器
      */
     private final OffsetMetadataManager offsetMetadataManager;
 
@@ -794,6 +794,8 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
     }
 
     /**
+     * 获取某个groupId下分区的offset
+     * <p>
      * Fetch offsets for a given set of partitions and a given group.
      *
      * @param request   The OffsetFetchRequestGroup request.
@@ -810,6 +812,7 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
     }
 
     /**
+     * 获取groupId所有分区的offset
      * Fetch all offsets for a given group.
      *
      * @param request   The OffsetFetchRequestGroup request.
@@ -826,6 +829,8 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
     }
 
     /**
+     * 提交offset
+     * <p>
      * Handles an OffsetCommit request.
      *
      * @param context The request context.
@@ -858,6 +863,8 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
     }
 
     /**
+     * 查询group
+     * <p>
      * Handles a ListGroups request.
      *
      * @param statesFilter      The states of the groups we want to list.

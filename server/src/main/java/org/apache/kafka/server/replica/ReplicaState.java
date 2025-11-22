@@ -63,6 +63,7 @@ public record ReplicaState(
         long leaderEndOffset,
         long currentTimeMs,
         long replicaMaxLagMs) {
+        // 如果从节点offset没有滞后 或 上次同步时间没有超出阈值
         return leaderEndOffset == logEndOffset() || currentTimeMs - lastCaughtUpTimeMs <= replicaMaxLagMs;
     }
 }

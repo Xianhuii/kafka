@@ -46,12 +46,12 @@ public final class MultiThreadedEventProcessor implements CoordinatorEventProces
     private final Logger log;
 
     /**
-     * The accumulator.
+     * The accumulator. 事件收集器
      */
     private final EventAccumulator<TopicPartition, CoordinatorEvent> accumulator;
 
     /**
-     * The processing threads.
+     * The processing threads. 处理线程
      */
     private final List<EventProcessorThread> threads;
 
@@ -104,11 +104,13 @@ public final class MultiThreadedEventProcessor implements CoordinatorEventProces
         this.time = Objects.requireNonNull(time);
         this.metrics = Objects.requireNonNull(metrics);
         this.metrics.registerEventQueueSizeGauge(accumulator::size);
+        // 创建线程
         this.threads = IntStream.range(0, numThreads).mapToObj(threadId ->
             new EventProcessorThread(
                 threadPrefix + threadId
             )
         ).collect(Collectors.toList());
+        // 启动线程
         this.threads.forEach(EventProcessorThread::start);
     }
 
@@ -128,6 +130,7 @@ public final class MultiThreadedEventProcessor implements CoordinatorEventProces
         }
 
         private void handleEvents() {
+            // 循环处理
             while (!shuttingDown) {
                 // We use a single meter for aggregate idle percentage for the thread pool.
                 // Since meter is calculated as total_recorded_value / time_window and
@@ -135,10 +138,12 @@ public final class MultiThreadedEventProcessor implements CoordinatorEventProces
                 // time should be discounted by # threads.
 
                 long idleStartTimeMs = time.milliseconds();
+                // 获取事件
                 CoordinatorEvent event = accumulator.poll(POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
                 long idleEndTimeMs = time.milliseconds();
                 long idleTimeMs = idleEndTimeMs - idleStartTimeMs;
                 metrics.recordThreadIdleTime((double) idleTimeMs / (double) threads.size());
+                // 执行事件
                 if (event != null) {
                     try {
                         log.debug("Executing event: {}.", event);
@@ -150,6 +155,7 @@ public final class MultiThreadedEventProcessor implements CoordinatorEventProces
                         log.error("Failed to run event {} due to: {}.", event, t.getMessage(), t);
                         event.complete(t);
                     } finally {
+                        // 移除
                         accumulator.done(event);
                     }
                 }
@@ -158,6 +164,7 @@ public final class MultiThreadedEventProcessor implements CoordinatorEventProces
 
         private void drainEvents() {
             CoordinatorEvent event;
+            // 拒绝所有事件
             while ((event = accumulator.poll()) != null) {
                 try {
                     log.debug("Draining event: {}.", event);
@@ -176,6 +183,7 @@ public final class MultiThreadedEventProcessor implements CoordinatorEventProces
             log.info("Starting");
 
             try {
+                // 处理事件
                 handleEvents();
             } catch (Throwable t) {
                 log.error("Exiting with exception.", t);
@@ -186,6 +194,7 @@ public final class MultiThreadedEventProcessor implements CoordinatorEventProces
             if (shuttingDown) {
                 log.info("Shutting down. Draining the remaining events.");
                 try {
+                    // 移除事件
                     drainEvents();
                 } catch (Throwable t) {
                     log.error("Draining threw exception.", t);

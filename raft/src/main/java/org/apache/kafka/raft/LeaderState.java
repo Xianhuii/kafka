@@ -65,7 +65,9 @@ public class LeaderState<T> implements EpochState {
     static final double CHECK_QUORUM_TIMEOUT_FACTOR = 1.5;
 
     private final VoterSet.VoterNode localVoterNode;
+    // 任期id
     private final int epoch;
+    // 任期起始offset
     private final long epochStartOffset;
     private final Set<Integer> grantingVoters;
     private final VoterSet voterSetAtEpochStart;
@@ -73,6 +75,7 @@ public class LeaderState<T> implements EpochState {
     private final OptionalLong offsetOfVotersAtEpochStart;
     private final KRaftVersion kraftVersionAtEpochStart;
 
+    // 表示分区中已成功复制到所有 ISR（In-Sync Replicas）副本的消息的最大偏移量。
     private Optional<LogOffsetMetadata> highWatermark = Optional.empty();
     private Map<Integer, ReplicaState> voterStates = new HashMap<>();
     private Optional<AddVoterHandlerState> addVoterHandlerState = Optional.empty();
@@ -80,6 +83,7 @@ public class LeaderState<T> implements EpochState {
 
     private final Map<ReplicaKey, ReplicaState> observerStates = new HashMap<>();
     private final Logger log;
+    // 收集操作日志
     private final BatchAccumulator<T> accumulator;
     // The set includes all the followers voters that FETCH or FETCH_SNAPSHOT during the current checkQuorumTimer interval.
     private final Set<Integer> fetchedVoters = new HashSet<>();
@@ -389,6 +393,9 @@ public class LeaderState<T> implements EpochState {
     }
 
 
+    /**
+     * 记录任期开始的控制日志
+     */
     public void appendStartOfEpochControlRecords(long currentTimeMs) {
         List<Voter> voters = convertToVoters(voterStates.keySet());
         List<Voter> grantingVoters = convertToVoters(this.grantingVoters());
@@ -399,6 +406,7 @@ public class LeaderState<T> implements EpochState {
             .setVoters(voters)
             .setGrantingVoters(grantingVoters);
 
+        // 组装成MemoryRecords，添加到accumulator，后台线程异步同步给Follower
         accumulator.appendControlMessages((baseOffset, epoch, compression, buffer) -> {
             try (MemoryRecordsBuilder builder = createControlRecordsBuilder(
                     baseOffset,
@@ -408,6 +416,7 @@ public class LeaderState<T> implements EpochState {
                     currentTimeMs
                 )
             ) {
+                // 记录Leader变更消息
                 builder.appendLeaderChangeMessage(currentTimeMs, leaderChangeMessage);
 
                 if (kraftVersionAtEpochStart.isReconfigSupported()) {
@@ -438,12 +447,14 @@ public class LeaderState<T> implements EpochState {
                                 )
                             );
 
+                        // 记录KRaftVersionRecord
                         builder.appendKRaftVersionMessage(
                             currentTimeMs,
                             new KRaftVersionRecord()
                                 .setVersion(kraftVersionAtEpochStart.kraftVersionRecordVersion())
                                 .setKRaftVersion(kraftVersionAtEpochStart.featureLevel())
                         );
+                        // 记录VotersRecord
                         builder.appendVotersMessage(
                             currentTimeMs,
                             updatedVoterSet.toVotersRecord(

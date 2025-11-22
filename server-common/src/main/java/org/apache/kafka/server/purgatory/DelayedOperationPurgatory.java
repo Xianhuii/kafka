@@ -35,6 +35,19 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * 延迟操作管理：
+ *      暂存未完成请求：如Producer的ACK=all请求需等待ISR所有副本同步完成，或Consumer需等待足够数据到达。
+ *      条件触发完成：当外部事件（如ISR同步完成）满足时，立即触发操作完成，避免阻塞。
+ * 超时控制：
+ *      若请求未在设定时间内完成（如request.timeout.ms），自动触发超时回调，返回错误响应。
+ * 资源隔离与性能优化：
+ *      通过分片（Sharding）和线程池隔离，避免锁竞争，支持高并发场景。
+ * 典型应用场景：
+ *      生产者等待ISR同步完成或超时后返回响应。
+ *      消费者等待拉取到足够数据或超时后返回空响应。
+ *      控制器处理Broker加入/退出集群时的延迟状态同步。
+ */
 public class DelayedOperationPurgatory<T extends DelayedOperation> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DelayedOperationPurgatory.class);
@@ -42,12 +55,15 @@ public class DelayedOperationPurgatory<T extends DelayedOperation> {
 
     private final KafkaMetricsGroup metricsGroup = new KafkaMetricsGroup("kafka.server", "DelayedOperationPurgatory");
     private final Map<String, String> metricsTags;
+    // 条件触发：当外部事件（如数据到达）发生时，调用checkAndComplete(key)，遍历对应分片的Watcher队列，尝试完成所有符合条件的任务。（分片存储）
     private final List<WatcherList> watcherLists;
     // the number of estimated total operations in the purgatory
     private final AtomicInteger estimatedTotalOperations = new AtomicInteger(0);
     /* background thread expiring operations that have timed out */
+    // 后台线程，用来触发Timer的超时操作，清除已完成的Watcher
     private final ExpiredOperationReaper expirationReaper;
     private final String purgatoryName;
+    // 超时触发：内部使用时间轮实现过期时间检测
     private final Timer timeoutTimer;
     private final int brokerId;
     private final int purgeInterval;
@@ -102,11 +118,13 @@ public class DelayedOperationPurgatory<T extends DelayedOperation> {
         }
     }
 
+    // 分片计算
     private WatcherList watcherList(DelayedOperationKey key) {
         return watcherLists.get(Math.abs(key.hashCode() % watcherLists.size()));
     }
 
     /**
+     * 检测操作是否已完成，如果未完成则添加到watcherLists和timeoutTimer
      * Check if the operation can be completed, if not watch it based on the given watch keys
      * <br/>
      * Note that a delayed operation can be watched on multiple keys. It is possible that
@@ -155,7 +173,7 @@ public class DelayedOperationPurgatory<T extends DelayedOperation> {
         if (operation.safeTryCompleteOrElse(() -> {
             watchKeys.forEach(key -> {
                 if (!operation.isCompleted())
-                    watchForOperation(key, operation);
+                    watchForOperation(key, operation); // 通过分片进行资源隔离，避免锁竞争，支持高并发场景
             });
             if (!watchKeys.isEmpty())
                 estimatedTotalOperations.incrementAndGet();
@@ -166,7 +184,7 @@ public class DelayedOperationPurgatory<T extends DelayedOperation> {
         // if it cannot be completed by now and hence is watched, add to the timeout queue also
         if (!operation.isCompleted()) {
             if (timerEnabled)
-                timeoutTimer.add(operation);
+                timeoutTimer.add(operation); // 添加到超时时间轮
             if (operation.isCompleted()) {
                 // cancel the timer task
                 operation.cancel();
@@ -176,6 +194,7 @@ public class DelayedOperationPurgatory<T extends DelayedOperation> {
     }
 
     /**
+     * 检测&触发延迟操作
      * Check if some delayed operations can be completed with the given watch key,
      * and if yes complete them.
      *
@@ -329,6 +348,7 @@ public class DelayedOperationPurgatory<T extends DelayedOperation> {
             operations.add(t);
         }
 
+        // 尝试触发监听的操作
         // traverse the list and try to complete some watched elements
         int tryCompleteWatched() {
             int completed = 0;
@@ -384,6 +404,7 @@ public class DelayedOperationPurgatory<T extends DelayedOperation> {
     }
 
     private void advanceClock(long timeoutMs) throws InterruptedException {
+        // 推进时间轮滚动，触发任务执行
         timeoutTimer.advanceClock(timeoutMs);
 
         // Trigger a purge if the number of completed but still being watched operations is larger than
@@ -396,6 +417,7 @@ public class DelayedOperationPurgatory<T extends DelayedOperation> {
             estimatedTotalOperations.getAndSet(numDelayed());
             LOG.debug("Begin purging watch lists");
             int purged = 0;
+            // 移除已完成的watcher
             for (WatcherList watcherList : watcherLists) {
                 purged += watcherList.allWatchers().stream().mapToInt(Watchers::purgeCompleted).sum();
             }
@@ -404,6 +426,7 @@ public class DelayedOperationPurgatory<T extends DelayedOperation> {
     }
 
     /**
+     * 继承ShutdownableThread，会在后台循环执行任务
      * A background reaper to expire delayed operations that have timed out
      */
     private class ExpiredOperationReaper extends ShutdownableThread {
@@ -414,6 +437,7 @@ public class DelayedOperationPurgatory<T extends DelayedOperation> {
         @Override
         public void doWork() {
             try {
+                // 循环执行任务
                 advanceClock(200L);
             } catch (InterruptedException ie) {
                 throw new RuntimeException(ie);

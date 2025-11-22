@@ -73,6 +73,8 @@ import java.util.function.IntSupplier;
 public interface GroupCoordinator {
 
     /**
+     * 消费组心跳
+     * <p>
      * Heartbeat to a Consumer Group.
      *
      * @param context           The request context.

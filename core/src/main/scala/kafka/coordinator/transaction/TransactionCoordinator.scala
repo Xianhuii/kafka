@@ -111,6 +111,7 @@ class TransactionCoordinator(txnConfig: TransactionConfig,
 
   val producerIdManager: ProducerIdManager = createProducerIdManager()
 
+  // 准备阶段：初始化producerId
   def handleInitProducerId(transactionalId: String,
                            transactionTimeoutMs: Int,
                            enableTwoPCFlag: Boolean,

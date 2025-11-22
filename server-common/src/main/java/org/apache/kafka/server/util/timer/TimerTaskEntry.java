@@ -17,7 +17,9 @@
 package org.apache.kafka.server.util.timer;
 
 public final class TimerTaskEntry {
+    // 任务
     public final TimerTask timerTask;
+    // 任务过期时间
     public final long expirationMs;
     volatile TimerTaskList list;
     TimerTaskEntry next;

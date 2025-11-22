@@ -140,6 +140,7 @@ class CoordinatorPartitionWriter(
   ): Long = {
     // We write synchronously to the leader replica without waiting on replication.
     val topicIdPartition: TopicIdPartition = replicaManager.topicIdPartition(tp)
+    // 将消息添加到Leader节点，不等待副本响应
     val appendResults = replicaManager.appendRecordsToLeader(
       requiredAcks = 1,
       internalTopicsAllowed = true,
@@ -166,6 +167,7 @@ class CoordinatorPartitionWriter(
   override def deleteRecords(tp: TopicPartition, deleteBeforeOffset: Long): CompletableFuture[Void] = {
     val responseFuture: CompletableFuture[Void] = new CompletableFuture[Void]()
 
+    // 删除所有节点的消息
     replicaManager.deleteRecords(
       timeout = 30000L, // 30 seconds.
       offsetPerPartition = Map(tp -> deleteBeforeOffset),

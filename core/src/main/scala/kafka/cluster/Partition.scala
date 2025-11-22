@@ -172,7 +172,9 @@ class Partition(val topicPartition: TopicPartition,
                ) extends Logging with TopicPartitionLog {
 
   import Partition.metricsGroup
+  // topic
   def topic: String = topicPartition.topic
+  // 分区id
   def partitionId: Int = topicPartition.partition
 
   private val stateChangeLogger = new StateChangeLogger(localBrokerId)
@@ -190,6 +192,7 @@ class Partition(val topicPartition: TopicPartition,
   @volatile private[cluster] var leaderEpochStartOffsetOpt: Option[Long] = None
   // Replica ID of the leader, defined when this broker is leader or follower for the partition.
   @volatile var leaderReplicaIdOpt: Option[Int] = None
+  // 分区状态
   @volatile private[cluster] var partitionState: PartitionState = new CommittedPartitionState(util.Set.of(), LeaderRecoveryState.RECOVERED)
   @volatile var assignmentState: AssignmentState = new SimpleAssignmentState(util.List.of())
 
@@ -757,6 +760,8 @@ class Partition(val topicPartition: TopicPartition,
   }
 
   /**
+   * 更新从节点状态
+   *
    * Update the follower's state in the leader based on the last fetch request. See
    * [[Replica.updateFetchStateOrThrow()]] for details.
    *
@@ -858,6 +863,8 @@ class Partition(val topicPartition: TopicPartition,
   }
 
   /**
+   * 扩展ISR
+   *
    * Check and maybe expand the ISR of the partition.
    * A replica will be added to ISR if its LEO >= current hw of the partition and it is caught up to
    * an offset within the current leader epoch. A replica must be caught up to the current leader
@@ -872,6 +879,7 @@ class Partition(val topicPartition: TopicPartition,
    * This function can be triggered when a replica's LEO has incremented.
    */
   private def maybeExpandIsr(followerReplica: Replica): Unit = {
+    // 校验是否需要加入ISR
     val needsIsrUpdate = !partitionState.isInflight && canAddReplicaToIsr(followerReplica.brokerId) && inReadLock(leaderIsrUpdateLock) {
       needsExpandIsr(followerReplica)
     }
@@ -887,6 +895,7 @@ class Partition(val topicPartition: TopicPartition,
       }
       // Send the AlterPartition request outside of the LeaderAndIsr lock since the completion logic
       // may increment the high watermark (and consequently complete delayed operations).
+      // 提交修改分区ISR通知请求
       alterIsrUpdateOpt.foreach(submitAlterPartition)
     }
   }
@@ -981,6 +990,7 @@ class Partition(val topicPartition: TopicPartition,
   }
 
   /**
+   * 检查是否需要更新分区主节点的高水位（高水位：ISR中的最小leo，即消费者可见的最新消息位置，保证了数据的一致性）
    * Check and maybe increment the high watermark of the partition;
    * this function can be triggered when
    *
@@ -1006,6 +1016,7 @@ class Partition(val topicPartition: TopicPartition,
    * @return true if the HW was incremented, and false otherwise.
    */
   private def maybeIncrementLeaderHW(leaderLog: UnifiedLog, currentTimeMs: Long = time.milliseconds): Boolean = {
+    // 如果当前是主节点 && ISR数量 < min.insync.replicas：不能更新HW
     if (isUnderMinIsr) {
       trace(s"Not increasing HWM because partition is under min ISR(ISR=${partitionState.isr}")
       return false
@@ -1014,6 +1025,7 @@ class Partition(val topicPartition: TopicPartition,
     // avoid unnecessary collection generation
     val leaderLogEndOffset = leaderLog.logEndOffsetMetadata
     var newHighWatermark = leaderLogEndOffset
+    // 遍历副本，将ISR最小LEO设为新的HW
     remoteReplicasMap.forEach { (_, replica) =>
       val replicaState = replica.stateSnapshot
 
@@ -1030,6 +1042,7 @@ class Partition(val topicPartition: TopicPartition,
       }
     }
 
+    // 更新HW
     leaderLog.maybeIncrementHighWatermark(newHighWatermark).toScala match {
       case Some(oldHighWatermark) =>
         debug(s"High watermark updated from $oldHighWatermark to $newHighWatermark")
@@ -1085,6 +1098,7 @@ class Partition(val topicPartition: TopicPartition,
   }
 
   def maybeShrinkIsr(): Unit = {
+    // 校验分区从节点是否滞留时间超出阈值或宕机
     def needsIsrUpdate: Boolean = {
       !partitionState.isInflight && inReadLock(leaderIsrUpdateLock) {
         needsShrinkIsr()
@@ -1094,9 +1108,11 @@ class Partition(val topicPartition: TopicPartition,
     if (needsIsrUpdate) {
       val alterIsrUpdateOpt = inWriteLock(leaderIsrUpdateLock) {
         leaderLogIfLocal.flatMap { leaderLog =>
+          // 获取需要移除的分区从节点id
           val outOfSyncReplicaIds = getOutOfSyncReplicas(replicaLagTimeMaxMs)
           partitionState match {
             case currentState: CommittedPartitionState if outOfSyncReplicaIds.nonEmpty =>
+              // 获取落后的从节点日志
               val outOfSyncReplicaLog = outOfSyncReplicaIds.map { replicaId =>
                 val replicaStateSnapshot = getReplica(replicaId).map(_.stateSnapshot)
                 val logEndOffsetMessage = replicaStateSnapshot
@@ -1112,6 +1128,7 @@ class Partition(val topicPartition: TopicPartition,
                 s"Leader: (highWatermark: ${leaderLog.highWatermark}, " +
                 s"endOffset: ${leaderLog.logEndOffset}). " +
                 s"Out of sync replicas: $outOfSyncReplicaLog.")
+              // 处理修改的分区
               Some(prepareIsrShrink(currentState, outOfSyncReplicaIds))
             case _ =>
               None
@@ -1120,10 +1137,12 @@ class Partition(val topicPartition: TopicPartition,
       }
       // Send the AlterPartition request outside of the LeaderAndIsr lock since the completion logic
       // may increment the high watermark (and consequently complete delayed operations).
+      // 提交修改的分区
       alterIsrUpdateOpt.foreach(submitAlterPartition)
     }
   }
 
+  // 是否需要缩小ISR
   private def needsShrinkIsr(): Boolean = {
     leaderLogIfLocal.exists { _ => getOutOfSyncReplicas(replicaLagTimeMaxMs).nonEmpty }
   }
@@ -1229,9 +1248,11 @@ class Partition(val topicPartition: TopicPartition,
               s"live replica(s) broker.id are : $inSyncReplicaIds")
           }
 
+          // 写日志
           val info = leaderLog.appendAsLeader(records, this.leaderEpoch, origin, requestLocal, verificationGuard)
 
           // we may need to increment high watermark since ISR could be down to 1
+          // 更新高水位
           (info, maybeIncrementLeaderHW(leaderLog))
 
         case None =>
@@ -1678,8 +1699,10 @@ class Partition(val topicPartition: TopicPartition,
     }
   }
 
+  // 提交修改的分区
   private def submitAlterPartition(proposedIsrState: PendingPartitionChange): CompletableFuture[LeaderAndIsr] = {
     debug(s"Submitting ISR state change $proposedIsrState")
+    // 提交ISR变更任务，广播ISR变更
     val future = alterIsrManager.submit(
       new org.apache.kafka.server.common.TopicIdPartition(topicId.getOrElse(throw new IllegalStateException("Topic id not set for " + topicPartition)), topicPartition.partition),
       proposedIsrState.sentLeaderAndIsr
@@ -1804,6 +1827,7 @@ class Partition(val topicPartition: TopicPartition,
       //   2) leaderAndIsr.partitionEpoch == partitionEpoch: No update was performed since proposed and actual state are the same.
       // In both cases, we want to move from Pending to Committed state to ensure new updates are processed.
 
+      // 更新分区ISR状态
       partitionState = new CommittedPartitionState(leaderAndIsr.isr, leaderAndIsr.leaderRecoveryState)
       partitionEpoch = leaderAndIsr.partitionEpoch
       info(s"ISR updated to ${partitionState.isr.asScala.mkString(",")} ${if (isUnderMinIsr) "(under-min-isr)" else ""} " +

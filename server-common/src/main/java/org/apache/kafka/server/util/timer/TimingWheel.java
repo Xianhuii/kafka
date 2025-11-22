@@ -20,6 +20,7 @@ import java.util.concurrent.DelayQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
+ * 分层时间轮
  * Hierarchical Timing Wheels
  * <br>
  * A simple timing wheel is a circular list of buckets of timer tasks. Let u be the time unit.
@@ -95,16 +96,23 @@ import java.util.concurrent.atomic.AtomicInteger;
  * It is caller's responsibility to enforce it. Simultaneous add calls are thread-safe.
  */
 public class TimingWheel {
+    // 单个时间格的时间跨度（如1ms）
     private final long tickMs;
+    // 时间格总数（如20）
     private final int wheelSize;
     private final AtomicInteger taskCounter;
+    // 延迟任务队列
     private final DelayQueue<TimerTaskList> queue;
+    // 时间轮总跨度（tickMs * wheelSize，如20ms）
     private final long interval;
+    // 存储时间格的数组，每个槽位对应一个TimerTaskList
     private final TimerTaskList[] buckets;
+    // 当前时间指针（修剪为tickMs的整数倍）
     private long currentTimeMs;
 
     // overflowWheel can potentially be updated and read by two concurrent threads through add().
     // Therefore, it needs to be volatile due to the issue of Double-Checked Locking pattern with JVM
+    // 上层时间轮的引用（用于任务降级）
     private volatile TimingWheel overflowWheel = null;
 
     TimingWheel(
@@ -120,7 +128,7 @@ public class TimingWheel {
         this.queue = queue;
         this.buckets = new TimerTaskList[wheelSize];
         this.interval = tickMs * wheelSize;
-        // rounding down to multiple of tickMs
+        // rounding down to multiple of tickMs 调整为tickMs的整数倍
         this.currentTimeMs = startMs - (startMs % tickMs);
 
         for (int i = 0; i < buckets.length; i++) {
@@ -131,7 +139,7 @@ public class TimingWheel {
     private synchronized void addOverflowWheel() {
         if (overflowWheel == null) {
             overflowWheel = new TimingWheel(
-                interval,
+                interval, // interval作为下一层的tickMs
                 wheelSize,
                 currentTimeMs,
                 taskCounter,
@@ -141,22 +149,30 @@ public class TimingWheel {
     }
 
     public boolean add(TimerTaskEntry timerTaskEntry) {
+        // 任务过期时间
         long expiration = timerTaskEntry.expirationMs;
 
+        // 任务已取消
         if (timerTaskEntry.cancelled()) {
             // Cancelled
             return false;
-        } else if (expiration < currentTimeMs + tickMs) {
+        }
+        // 任务已过期
+        else if (expiration < currentTimeMs + tickMs) {
             // Already expired
             return false;
-        } else if (expiration < currentTimeMs + interval) {
+        }
+        // 任务在当前层级时间轮
+        else if (expiration < currentTimeMs + interval) {
             // Put in its own bucket
+            // 计算所属槽
             long virtualId = expiration / tickMs;
             int bucketId = (int) (virtualId % (long) wheelSize);
             TimerTaskList bucket = buckets[bucketId];
+            // 添加任务
             bucket.add(timerTaskEntry);
 
-            // Set the bucket expiration time
+            // Set the bucket expiration time 设置槽的过期时间，添加到队列
             if (bucket.setExpiration(virtualId * tickMs)) {
                 // The bucket needs to be enqueued because it was an expired bucket
                 // We only need to enqueue the bucket when its expiration time has changed, i.e. the wheel has advanced
@@ -167,18 +183,24 @@ public class TimingWheel {
             }
 
             return true;
-        } else {
+        }
+        // 添加到下一层时间轮
+        else {
             // Out of the interval. Put it into the parent timer
             if (overflowWheel == null) addOverflowWheel();
             return overflowWheel.add(timerTaskEntry);
         }
     }
 
+    /**
+     * 滚动时间轮，更新currentTimeMs
+     * @param timeMs
+     */
     public void advanceClock(long timeMs) {
         if (timeMs >= currentTimeMs + tickMs) {
             currentTimeMs = timeMs - (timeMs % tickMs);
 
-            // Try to advance the clock of the overflow wheel if present
+            // Try to advance the clock of the overflow wheel if present 滚动下一层时间轮
             if (overflowWheel != null) overflowWheel.advanceClock(currentTimeMs);
         }
     }

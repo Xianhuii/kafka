@@ -25,6 +25,9 @@ import org.apache.kafka.snapshot.RawSnapshotWriter;
 
 import java.util.Optional;
 
+/**
+ * 复制日志，用于记录增量操作和集群节点间同步数据
+ */
 public interface ReplicatedLog extends AutoCloseable {
 
     /**

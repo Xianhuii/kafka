@@ -28,6 +28,9 @@ import scala.collection.{Map, Set, mutable}
 import scala.jdk.CollectionConverters._
 import scala.jdk.OptionConverters._
 
+/**
+ * 分区从节点定时请求主节点拉取消息的管理器
+ */
 abstract class AbstractFetcherManager[T <: AbstractFetcherThread](val name: String, clientId: String, numFetchers: Int)
   extends Logging {
   // Changing the package or class name may cause incompatibility with existing code and metrics configuration
@@ -142,6 +145,7 @@ abstract class AbstractFetcherManager[T <: AbstractFetcherThread](val name: Stri
         fetcherThread
       }
 
+      // 为每个broker-topic-partition创建异步同步数据的线程
       for ((brokerAndFetcherId, initialFetchOffsets) <- partitionsPerFetcher) {
         val brokerIdAndFetcherId = BrokerIdAndFetcherId(brokerAndFetcherId.broker.id, brokerAndFetcherId.fetcherId)
         val fetcherThread = fetcherThreadMap.get(brokerIdAndFetcherId) match {
@@ -192,11 +196,17 @@ abstract class AbstractFetcherManager[T <: AbstractFetcherThread](val name: Stri
     }
   }
 
+  /**
+   * 移除fetch线程中TopicPartition任务
+   */
   def removeFetcherForPartitions(partitions: Set[TopicPartition]): Map[TopicPartition, PartitionFetchState] = {
     val fetchStates = mutable.Map.empty[TopicPartition, PartitionFetchState]
     lock synchronized {
-      for (fetcher <- fetcherThreadMap.values)
+      // 遍历fetch线程
+      for (fetcher <- fetcherThreadMap.values) {
+        // 移除分区
         fetchStates ++= fetcher.removePartitions(partitions)
+      }
       failedPartitions.removeAll(partitions)
     }
     if (partitions.nonEmpty)

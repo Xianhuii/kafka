@@ -26,6 +26,9 @@ import org.apache.kafka.server.LeaderEndPoint
 import java.util.Optional
 import scala.collection.mutable
 
+/**
+ * 分区从节点定时请求主节点拉取消息
+ */
 class ReplicaFetcherThread(name: String,
                            leader: LeaderEndPoint,
                            brokerConfig: KafkaConfig,
@@ -117,7 +120,7 @@ class ReplicaFetcherThread(name: String,
       trace("Follower has replica log end offset %d for partition %s. Received %d bytes of messages and leader hw %d"
         .format(log.logEndOffset, topicPartition, records.sizeInBytes, partitionData.highWatermark))
 
-    // Append the leader's messages to the log
+    // Append the leader's messages to the log 将拉取到的消息保存到本地日志文件
     val logAppendInfo = partition.appendRecordsToFollowerOrFutureReplica(records, isFuture = false, partitionLeaderEpoch)
 
     if (logTrace)
@@ -133,6 +136,7 @@ class ReplicaFetcherThread(name: String,
       partitionsWithNewHighWatermark += topicPartition
     }
 
+    // 更新start-offset
     log.maybeIncrementLogStartOffset(leaderLogStartOffset, LogStartOffsetIncrementReason.LeaderOffsetIncremented)
     if (logTrace)
       trace(s"Follower received high watermark ${partitionData.highWatermark} from the leader " +

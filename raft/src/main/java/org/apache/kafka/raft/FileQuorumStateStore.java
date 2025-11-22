@@ -79,6 +79,7 @@ public class FileQuorumStateStore implements QuorumStateStore {
 
     public static final String DEFAULT_FILE_NAME = "quorum-state";
 
+    // __cluster_metadata-0/quorum-state
     private final File stateFile;
 
     public FileQuorumStateStore(final File stateFile) {

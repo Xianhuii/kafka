@@ -36,46 +36,46 @@ import java.util.Random;
  * This class is responsible for managing the current state of this node and ensuring
  * only valid state transitions. Below we define the possible state transitions and
  * how they are triggered:
- *
+ * <p>
  * Resigned transitions to:
  *    Unattached:  After learning of a new election with a higher epoch, or expiration of the election timeout
  *    Follower:    After discovering a leader with a larger epoch
- *
+ * <p>
  * Unattached transitions to:
  *    Unattached:  After learning of a new election with a higher epoch or after giving a binding vote
  *    Prospective: After expiration of the election timeout
  *    Follower:    After discovering a leader with an equal or larger epoch
- *
+ * <p>
  * Prospective transitions to:
  *    Unattached:  After learning of an election with a higher epoch, or node did not have last
  *                 known leader and loses/times out election
  *    Candidate:   After receiving a majority of PreVotes granted
  *    Follower:    After discovering a leader with a larger epoch, or node had a last known leader
  *                 and loses/times out election
- *
+ * <p>
  * Candidate transitions to:
  *    Unattached:  After learning of a new election with a higher epoch
  *    Prospective: After expiration of the election timeout or loss of election
  *    Leader:      After receiving a majority of votes
- *
+ * <p>
  * Leader transitions to:
  *    Unattached:  After learning of a new election with a higher epoch
  *    Resigned:    When shutting down gracefully
  *    Follower:    After discovering a leader with a larger epoch
- *
+ * <p>
  * Follower transitions to:
  *    Unattached:  After learning of a new election with a higher epoch
  *    Prospective: After expiration of the fetch timeout
  *    Follower:    After discovering a leader with a larger epoch
- *
+ * <p>
  * Observers follow a simpler state machine. The Prospective/Candidate/Leader/Resigned
  * states are not possible for observers, so the only transitions that are possible
  * are between Unattached and Follower.
- *
+ * <p>
  * Unattached transitions to:
  *    Unattached: After learning of a new election with a higher epoch
  *    Follower:   After discovering a leader with an equal or larger epoch
- *
+ * <p>
  * Follower transitions to:
  *    Unattached: After learning of a new election with a higher epoch
  *    Follower:   After discovering a leader with a larger epoch
@@ -678,6 +678,9 @@ public class QuorumState {
         }
     }
 
+    /**
+     * 晋升为Leader
+     */
     public <T> LeaderState<T> transitionToLeader(long epochStartOffset, BatchAccumulator<T> accumulator) {
         if (isObserver()) {
             throw new IllegalStateException(

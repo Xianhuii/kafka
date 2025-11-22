@@ -151,6 +151,9 @@ public record EpochElection(Map<Integer, VoterState> voterStates) {
         return voterStates.size() / 2 + 1;
     }
 
+    /**
+     * 投票状态
+     */
     private static final class VoterState {
         private final ReplicaKey replicaKey;
         private State state = State.UNRECORDED;
