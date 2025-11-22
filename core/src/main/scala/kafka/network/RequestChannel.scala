@@ -351,7 +351,9 @@ class RequestChannel(val queueSize: Int,
   private val metricsClassName = "RequestChannel"
   private val metricsGroup = new KafkaMetricsGroup(metricsPackage, metricsClassName)
 
+  // 请求消息队列
   private val requestQueue = new ArrayBlockingQueue[BaseRequest](queueSize)
+  // 处理器
   private val processors = new ConcurrentHashMap[Int, Processor]()
   private val callbackQueue = new ArrayBlockingQueue[BaseRequest](queueSize)
 
@@ -376,7 +378,10 @@ class RequestChannel(val queueSize: Int,
     metricsGroup.removeMetric(ResponseQueueSizeMetric, Map(ProcessorMetricTag -> processorId.toString).asJava)
   }
 
-  /** Send a request to be handled, potentially blocking until there is room in the queue for the request */
+  /**
+   * 将接收到的请求入队，等待后续处理
+   * Send a request to be handled, potentially blocking until there is room in the queue for the request
+   */
   def sendRequest(request: RequestChannel.Request): Unit = {
     requestQueue.put(request)
   }
@@ -391,6 +396,9 @@ class RequestChannel(val queueSize: Int,
     sendResponse(new RequestChannel.CloseConnectionResponse(request))
   }
 
+  /**
+   * 发送响应（添加到SocketServer的响应队列）
+   */
   def sendResponse(
     request: RequestChannel.Request,
     response: AbstractResponse,
@@ -455,6 +463,7 @@ class RequestChannel(val queueSize: Int,
     // The processor may be null if it was shutdown. In this case, the connections
     // are closed, so the response is dropped.
     if (processor != null) {
+      // 添加到响应队列
       processor.enqueueResponse(response)
     }
   }

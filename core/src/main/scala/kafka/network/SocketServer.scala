@@ -859,6 +859,7 @@ private[kafka] class Processor(
 
   private val newConnections = new ArrayBlockingQueue[SocketChannel](connectionQueueSize)
   private val inflightResponses = mutable.Map[String, RequestChannel.Response]()
+  // 响应队列
   private val responseQueue = new LinkedBlockingDeque[RequestChannel.Response]()
 
   private[kafka] val metricTags = mutable.LinkedHashMap(
