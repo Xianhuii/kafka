@@ -68,7 +68,17 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.IntSupplier;
 
 /**
- * Group Coordinator's internal API.
+ * Group Coordinator's internal API. 消费组协调器内部API
+ * 成员管理：
+ *      维护消费者组的成员列表（members），记录每个消费者的元数据（如IP、订阅主题、协议支持等）。
+ *      处理消费者的加入（JoinGroup）和离开（LeaveGroup）请求，触发再平衡流程。
+ * 分区分配：
+ *      根据消费者支持的分配策略（如Range、RoundRobin），由组内Leader协调员计算分区分配方案，并通过SyncGroup请求同步给所有成员。
+ * 偏移量管理：
+ *      将消费者提交的偏移量（Offset）存储到内部主题__consumer_offsets中，确保消费进度的持久化与恢复。
+ * 心跳检测：
+ *      通过心跳机制（Heartbeat）监控消费者存活状态，超时未响应则触发再平衡。
+ *
  */
 public interface GroupCoordinator {
 
@@ -117,6 +127,7 @@ public interface GroupCoordinator {
     );
 
     /**
+     * 处理消费者加入组的请求，选举Leader并触发再平衡流程。
      * Join a Classic Group.
      *
      * @param context           The request context.
@@ -133,6 +144,7 @@ public interface GroupCoordinator {
     );
 
     /**
+     * 处理分区分配请求，由Leader生成分配方案并下发给所有成员。
      * Sync a Classic Group.
      *
      * @param context           The coordinator request context.
@@ -149,6 +161,7 @@ public interface GroupCoordinator {
     );
 
     /**
+     * 处理心跳请求，检测消费者存活状态，超时则触发再平衡。
      * Heartbeat to a Classic Group.
      *
      * @param context           The coordinator request context.
@@ -163,6 +176,7 @@ public interface GroupCoordinator {
     );
 
     /**
+     * 处理消费者主动离开组的请求，触发再平衡。
      * Leave a Classic Group.
      *
      * @param context           The coordinator request context.
@@ -191,6 +205,7 @@ public interface GroupCoordinator {
     );
 
     /**
+     * 返回消费者组的元数据（状态、协议、成员列表等）。
      * Describe Groups.
      *
      * @param context           The coordinator request context.

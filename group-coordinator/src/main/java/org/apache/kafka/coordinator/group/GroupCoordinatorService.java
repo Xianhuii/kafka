@@ -915,6 +915,7 @@ public class GroupCoordinatorService implements GroupCoordinator {
             "classic-group-join",
             topicPartitionFor(request.groupId()),
             Duration.ofMillis(config.offsetCommitTimeoutMs()),
+            // 加入组
             coordinator -> coordinator.classicGroupJoin(context, request, responseFuture)
         ).exceptionally(exception -> {
             if (!responseFuture.isDone()) {

@@ -6189,11 +6189,13 @@ public class GroupMetadataManager {
         JoinGroupRequestData request,
         CompletableFuture<JoinGroupResponseData> responseFuture
     ) {
+        // 获取group
         Group group = groups.get(request.groupId(), Long.MAX_VALUE);
         if (group != null) {
             if (group.type() == CONSUMER && !group.isEmpty()) {
                 // classicGroupJoinToConsumerGroup takes the join requests to non-empty consumer groups.
                 // The empty consumer groups should be converted to classic groups in classicGroupJoinToClassicGroup.
+                // 加入消费组
                 return classicGroupJoinToConsumerGroup((ConsumerGroup) group, context, request, responseFuture);
             } else if (group.type() == CONSUMER || group.type() == CLASSIC || group.type() == STREAMS && group.isEmpty()) {
                 // classicGroupJoinToClassicGroup accepts:
